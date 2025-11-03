@@ -1,7 +1,7 @@
-package com.hh.ecom.controller;
+package com.hh.ecom.presentation;
 
-import com.hh.ecom.controller.api.PointApi;
-import com.hh.ecom.dto.request.ChargePointRequest;
+import com.hh.ecom.presentation.api.PointApi;
+import com.hh.ecom.presentation.dto.request.ChargePointRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 

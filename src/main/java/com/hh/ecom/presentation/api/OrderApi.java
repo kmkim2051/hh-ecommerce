@@ -1,6 +1,6 @@
-package com.hh.ecom.controller.api;
+package com.hh.ecom.presentation.api;
 
-import com.hh.ecom.dto.request.CreateOrderRequest;
+import com.hh.ecom.presentation.dto.request.CreateOrderRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;

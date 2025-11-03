@@ -1,8 +1,8 @@
-package com.hh.ecom.controller;
+package com.hh.ecom.presentation;
 
-import com.hh.ecom.controller.api.CartApi;
-import com.hh.ecom.dto.request.CreateCartItemRequest;
-import com.hh.ecom.dto.request.UpdateCartItemRequest;
+import com.hh.ecom.presentation.api.CartApi;
+import com.hh.ecom.presentation.dto.request.CreateCartItemRequest;
+import com.hh.ecom.presentation.dto.request.UpdateCartItemRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 

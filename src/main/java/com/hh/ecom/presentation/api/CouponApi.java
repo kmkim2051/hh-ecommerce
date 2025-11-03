@@ -1,7 +1,7 @@
-package com.hh.ecom.controller.api;
+package com.hh.ecom.presentation.api;
 
-import com.hh.ecom.dto.request.ChargePointRequest;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -11,12 +11,12 @@ import org.springframework.http.ResponseEntity;
 
 import java.util.Map;
 
-@Tag(name = "Point", description = "포인트 관리 API")
-public interface PointApi {
+@Tag(name = "Coupon", description = "쿠폰 관리 API")
+public interface CouponApi {
 
     @Operation(
-            summary = "포인트 잔액 조회",
-            description = "현재 사용자의 포인트 잔액을 조회합니다."
+            summary = "발급 가능한 쿠폰 목록 조회",
+            description = "현재 발급 가능한 모든 쿠폰 목록을 조회합니다."
     )
     @ApiResponses(value = {
             @ApiResponse(
@@ -25,31 +25,27 @@ public interface PointApi {
                     content = @Content(schema = @Schema(implementation = Map.class))
             )
     })
-    ResponseEntity<Map<String, Object>> getPointBalance();
+    ResponseEntity<Map<String, Object>> getAvailableCoupons();
 
     @Operation(
-            summary = "포인트 충전",
-            description = "사용자의 포인트를 충전합니다."
+            summary = "쿠폰 발급",
+            description = "선착순으로 쿠폰을 발급받습니다."
     )
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
-                    description = "충전 성공",
+                    description = "발급 성공",
                     content = @Content(schema = @Schema(implementation = Map.class))
             )
     })
-    ResponseEntity<Map<String, Object>> chargePoint(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "포인트 충전 요청",
-                    required = true,
-                    content = @Content(schema = @Schema(implementation = Map.class))
-            )
-            ChargePointRequest request
+    ResponseEntity<Map<String, Object>> issueCoupon(
+            @Parameter(description = "쿠폰 ID", required = true)
+            Long couponId
     );
 
     @Operation(
-            summary = "포인트 거래 내역 조회",
-            description = "사용자의 포인트 충전/사용/환불 내역을 조회합니다."
+            summary = "내 쿠폰 목록 조회",
+            description = "사용자가 보유한 쿠폰 목록을 조회합니다."
     )
     @ApiResponses(value = {
             @ApiResponse(
@@ -58,5 +54,5 @@ public interface PointApi {
                     content = @Content(schema = @Schema(implementation = Map.class))
             )
     })
-    ResponseEntity<Map<String, Object>> getPointTransactions();
+    ResponseEntity<Map<String, Object>> getMyCoupons();
 }

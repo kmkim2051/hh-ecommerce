@@ -1,6 +1,6 @@
-package com.hh.ecom.controller;
+package com.hh.ecom.presentation;
 
-import com.hh.ecom.controller.api.ProductApi;
+import com.hh.ecom.presentation.api.ProductApi;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 

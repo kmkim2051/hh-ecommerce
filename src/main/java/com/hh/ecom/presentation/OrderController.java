@@ -1,7 +1,7 @@
-package com.hh.ecom.controller;
+package com.hh.ecom.presentation;
 
-import com.hh.ecom.controller.api.OrderApi;
-import com.hh.ecom.dto.request.CreateOrderRequest;
+import com.hh.ecom.presentation.api.OrderApi;
+import com.hh.ecom.presentation.dto.request.CreateOrderRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
