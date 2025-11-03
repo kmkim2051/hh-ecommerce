@@ -59,4 +59,36 @@ public interface ProductApi {
             @Parameter(description = "상품 ID", required = true)
             Long id
     );
+
+    @Operation(
+            summary = "조회수 기반 상품 순위 조회",
+            description = "조회수가 높은 순으로 상품 순위를 조회합니다."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = Map.class))
+            )
+    })
+    ResponseEntity<Map<String, Object>> getProductsByViewCount(
+            @Parameter(description = "조회할 상품 개수", required = false)
+            Integer limit
+    );
+
+    @Operation(
+            summary = "판매량 기반 상품 순위 조회",
+            description = "판매량이 높은 순으로 상품 순위를 조회합니다."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = Map.class))
+            )
+    })
+    ResponseEntity<Map<String, Object>> getProductsBySalesCount(
+            @Parameter(description = "조회할 상품 개수", required = false)
+            Integer limit
+    );
 }

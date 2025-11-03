@@ -2,10 +2,7 @@ package com.hh.ecom.controller;
 
 import com.hh.ecom.controller.api.ProductApi;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
@@ -90,6 +87,123 @@ public class ProductController implements ProductApi {
         response.put("productName", "노트북");
         response.put("stockQuantity", 50);
         response.put("available", true);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @Override
+    @GetMapping("/ranking/views")
+    public ResponseEntity<Map<String, Object>> getProductsByViewCount(
+            @RequestParam(required = false, defaultValue = "10") Integer limit) {
+        Map<String, Object> response = new HashMap<>();
+
+        List<Map<String, Object>> products = new ArrayList<>();
+
+        Map<String, Object> product1 = new HashMap<>();
+        product1.put("rank", 1);
+        product1.put("id", 1L);
+        product1.put("name", "노트북");
+        product1.put("price", 1500000);
+        product1.put("viewCount", 15230);
+        products.add(product1);
+
+        Map<String, Object> product2 = new HashMap<>();
+        product2.put("rank", 2);
+        product2.put("id", 4L);
+        product2.put("name", "모니터");
+        product2.put("price", 350000);
+        product2.put("viewCount", 12450);
+        products.add(product2);
+
+        Map<String, Object> product3 = new HashMap<>();
+        product3.put("rank", 3);
+        product3.put("id", 3L);
+        product3.put("name", "기계식 키보드");
+        product3.put("price", 120000);
+        product3.put("viewCount", 9870);
+        products.add(product3);
+
+        Map<String, Object> product4 = new HashMap<>();
+        product4.put("rank", 4);
+        product4.put("id", 5L);
+        product4.put("name", "웹캠");
+        product4.put("price", 85000);
+        product4.put("viewCount", 7230);
+        products.add(product4);
+
+        Map<String, Object> product5 = new HashMap<>();
+        product5.put("rank", 5);
+        product5.put("id", 2L);
+        product5.put("name", "무선 마우스");
+        product5.put("price", 35000);
+        product5.put("viewCount", 5890);
+        products.add(product5);
+
+        if (limit != null && limit > 0 && limit < products.size()) {
+            products = products.subList(0, limit);
+        }
+
+        response.put("products", products);
+        response.put("totalCount", products.size());
+        response.put("rankingType", "VIEW_COUNT");
+
+        return ResponseEntity.ok(response);
+    }
+
+    @Override
+    @GetMapping("/ranking/sales")
+    public ResponseEntity<Map<String, Object>> getProductsBySalesCount(@RequestParam(required = false, defaultValue = "10") Integer limit) {
+        Map<String, Object> response = new HashMap<>();
+
+        List<Map<String, Object>> products = new ArrayList<>();
+
+        Map<String, Object> product1 = new HashMap<>();
+        product1.put("rank", 1);
+        product1.put("id", 2L);
+        product1.put("name", "무선 마우스");
+        product1.put("price", 35000);
+        product1.put("salesCount", 3420);
+        products.add(product1);
+
+        Map<String, Object> product2 = new HashMap<>();
+        product2.put("rank", 2);
+        product2.put("id", 1L);
+        product2.put("name", "노트북");
+        product2.put("price", 1500000);
+        product2.put("salesCount", 2150);
+        products.add(product2);
+
+        Map<String, Object> product3 = new HashMap<>();
+        product3.put("rank", 3);
+        product3.put("id", 3L);
+        product3.put("name", "기계식 키보드");
+        product3.put("price", 120000);
+        product3.put("salesCount", 1890);
+        products.add(product3);
+
+        Map<String, Object> product4 = new HashMap<>();
+        product4.put("rank", 4);
+        product4.put("id", 5L);
+        product4.put("name", "웹캠");
+        product4.put("price", 85000);
+        product4.put("salesCount", 980);
+        products.add(product4);
+
+        Map<String, Object> product5 = new HashMap<>();
+        product5.put("rank", 5);
+        product5.put("id", 4L);
+        product5.put("name", "모니터");
+        product5.put("price", 350000);
+        product5.put("salesCount", 750);
+        products.add(product5);
+
+        if (limit != null && limit > 0 && limit < products.size()) {
+            products = products.subList(0, limit);
+        }
+
+        response.put("products", products);
+        response.put("totalCount", products.size());
+        response.put("rankingType", "SALES_COUNT");
 
         return ResponseEntity.ok(response);
     }
