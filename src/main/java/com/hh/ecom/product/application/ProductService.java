@@ -47,20 +47,10 @@ public class ProductService {
                 .orElseThrow(() -> new IllegalArgumentException("Product not found with id: " + id));
     }
 
-    /**
-     * 조회수 기반 상품 순위 조회
-     * @param limit 조회할 상품 개수 (default: 10)
-     * @return 조회수 순으로 정렬된 상품 목록
-     */
     public List<Product> getProductsByViewCount(Integer limit) {
         return productRepository.findTopByViewCount(limit);
     }
 
-    /**
-     * 판매량 기반 상품 순위 조회
-     * @param limit 조회할 상품 개수 (default: 10)
-     * @return 판매량 순으로 정렬된 상품 목록
-     */
     public List<Product> getProductsBySalesCount(Integer limit) {
         return productRepository.findTopBySalesCount(limit);
     }

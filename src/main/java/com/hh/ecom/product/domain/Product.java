@@ -1,5 +1,7 @@
 package com.hh.ecom.product.domain;
 
+import com.hh.ecom.product.domain.exception.ProductErrorCode;
+import com.hh.ecom.product.domain.exception.ProductException;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -54,7 +56,8 @@ public class Product {
 
     public Product decreaseStock(int quantity) {
         if (!hasEnoughStock(quantity)) {
-            throw new IllegalArgumentException("재고가 부족합니다. 현재 재고: " + this.stockQuantity);
+            throw new ProductException(ProductErrorCode.INSUFFICIENT_STOCK,
+                    "요청: " + quantity + ", 현재 재고: " + this.stockQuantity);
         }
         return withUpdate(this.toBuilder()
                 .stockQuantity(this.stockQuantity - quantity)
