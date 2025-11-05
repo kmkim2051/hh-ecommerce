@@ -2,6 +2,8 @@ package com.hh.ecom.product.application;
 
 import com.hh.ecom.product.domain.Product;
 import com.hh.ecom.product.domain.ProductRepository;
+import com.hh.ecom.product.domain.exception.ProductErrorCode;
+import com.hh.ecom.product.domain.exception.ProductException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -36,15 +38,13 @@ public class ProductService {
     }
 
     public Product getProduct(Long id) {
-        // todo: custom exception
         return productRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Product not found with id: " + id));
+                .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND, "ID: " + id));
     }
 
     public Product getProductStock(Long id) {
-        // todo: custom exception
         return productRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Product not found with id: " + id));
+                .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND, "ID: " + id));
     }
 
     public List<Product> getProductsByViewCount(Integer limit) {
