@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 
 import java.util.List;
@@ -18,7 +19,7 @@ public interface ProductApi {
 
     @Operation(
             summary = "상품 목록 조회",
-            description = "전체 상품 목록을 조회합니다."
+            description = "전체 상품 목록을 페이징 처리하여 조회합니다."
     )
     @ApiResponses(value = {
             @ApiResponse(
@@ -27,7 +28,12 @@ public interface ProductApi {
                     content = @Content(schema = @Schema(implementation = Product.class))
             )
     })
-    ResponseEntity<List<Product>> getProducts();
+    ResponseEntity<Page<Product>> getProducts(
+            @Parameter(description = "페이지 번호 (0부터 시작)", example = "0")
+            Integer page,
+            @Parameter(description = "페이지 크기", example = "20")
+            Integer size
+    );
 
     @Operation(
             summary = "상품 상세 조회",

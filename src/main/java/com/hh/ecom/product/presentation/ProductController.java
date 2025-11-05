@@ -4,6 +4,9 @@ import com.hh.ecom.product.application.ProductService;
 import com.hh.ecom.product.domain.Product;
 import com.hh.ecom.product.presentation.api.ProductApi;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,8 +21,11 @@ public class ProductController implements ProductApi {
 
     @Override
     @GetMapping
-    public ResponseEntity<List<Product>> getProducts() {
-        List<Product> products = productService.getProductList();
+    public ResponseEntity<Page<Product>> getProducts(
+            @RequestParam(required = false, defaultValue = "0") Integer page,
+            @RequestParam(required = false, defaultValue = "20") Integer size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Product> products = productService.getProductList(pageable);
         return ResponseEntity.ok(products);
     }
 
