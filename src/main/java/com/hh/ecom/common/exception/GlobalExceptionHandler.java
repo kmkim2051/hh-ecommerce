@@ -1,5 +1,6 @@
 package com.hh.ecom.common.exception;
 
+import com.hh.ecom.point.domain.exception.PointException;
 import com.hh.ecom.product.domain.exception.ProductException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,17 @@ public class GlobalExceptionHandler {
                 .body(errorResponse);
     }
 
+    @ExceptionHandler(PointException.class)
+    public ResponseEntity<ErrorResponse> handlePointException(
+            PointException e,
+            HttpServletRequest request
+    ) {
+        log.warn("PointException occurred: code={}, message={}, path={}",
+                e.getCode(), e.getMessage(), request.getRequestURI(), e);
+
+        return buildErrorResponseEntity(e, request);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException(
             Exception e,
@@ -46,6 +58,18 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .internalServerError()
+                .body(errorResponse);
+    }
+
+    private static ResponseEntity<ErrorResponse> buildErrorResponseEntity(PointException e, HttpServletRequest request) {
+        ErrorResponse errorResponse = ErrorResponse.of(
+                e.getCode(),
+                e.getMessage(),
+                request.getRequestURI()
+        );
+
+        return ResponseEntity
+                .status(e.getErrorCode().getHttpStatus())
                 .body(errorResponse);
     }
 }
