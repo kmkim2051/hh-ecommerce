@@ -1,5 +1,7 @@
 package com.hh.ecom.cart.presentation.api;
 
+import com.hh.ecom.cart.presentation.dto.CartItemListResponse;
+import com.hh.ecom.cart.presentation.dto.CartItemMessageResponse;
 import com.hh.ecom.product.presentation.dto.request.CreateCartItemRequest;
 import com.hh.ecom.product.presentation.dto.request.UpdateCartItemRequest;
 import io.swagger.v3.oas.annotations.Operation;
@@ -10,8 +12,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
-
-import java.util.Map;
 
 @Tag(name = "Cart", description = "장바구니 관리 API")
 public interface CartApi {
@@ -24,10 +24,13 @@ public interface CartApi {
             @ApiResponse(
                     responseCode = "200",
                     description = "조회 성공",
-                    content = @Content(schema = @Schema(implementation = Map.class))
+                    content = @Content(schema = @Schema(implementation = CartItemListResponse.class))
             )
     })
-    ResponseEntity<Map<String, Object>> getCartItems();
+    ResponseEntity<CartItemListResponse> getCartItems(
+            @Parameter(description = "사용자 ID", required = true)
+            Long userId
+    );
 
     @Operation(
             summary = "장바구니에 상품 추가",
@@ -37,14 +40,16 @@ public interface CartApi {
             @ApiResponse(
                     responseCode = "200",
                     description = "추가 성공",
-                    content = @Content(schema = @Schema(implementation = Map.class))
+                    content = @Content(schema = @Schema(implementation = CartItemMessageResponse.class))
             )
     })
-    ResponseEntity<Map<String, Object>> addCartItem(
+    ResponseEntity<CartItemMessageResponse> addCartItem(
+            @Parameter(description = "사용자 ID", required = true)
+            Long userId,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "장바구니 추가 요청",
                     required = true,
-                    content = @Content(schema = @Schema(implementation = Map.class))
+                    content = @Content(schema = @Schema(implementation = CreateCartItemRequest.class))
             )
             CreateCartItemRequest request
     );
@@ -57,16 +62,18 @@ public interface CartApi {
             @ApiResponse(
                     responseCode = "200",
                     description = "수정 성공",
-                    content = @Content(schema = @Schema(implementation = Map.class))
+                    content = @Content(schema = @Schema(implementation = CartItemMessageResponse.class))
             )
     })
-    ResponseEntity<Map<String, Object>> updateCartItemQuantity(
+    ResponseEntity<CartItemMessageResponse> updateCartItemQuantity(
+            @Parameter(description = "사용자 ID", required = true)
+            Long userId,
             @Parameter(description = "장바구니 아이템 ID", required = true)
             Long id,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "수량 변경 요청",
                     required = true,
-                    content = @Content(schema = @Schema(implementation = Map.class))
+                    content = @Content(schema = @Schema(implementation = UpdateCartItemRequest.class))
             )
             UpdateCartItemRequest request
     );
@@ -79,10 +86,12 @@ public interface CartApi {
             @ApiResponse(
                     responseCode = "200",
                     description = "삭제 성공",
-                    content = @Content(schema = @Schema(implementation = Map.class))
+                    content = @Content(schema = @Schema(implementation = CartItemMessageResponse.class))
             )
     })
-    ResponseEntity<Map<String, Object>> deleteCartItem(
+    ResponseEntity<CartItemMessageResponse> deleteCartItem(
+            @Parameter(description = "사용자 ID", required = true)
+            Long userId,
             @Parameter(description = "장바구니 아이템 ID", required = true)
             Long id
     );
