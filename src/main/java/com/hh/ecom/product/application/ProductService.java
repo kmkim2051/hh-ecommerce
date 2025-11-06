@@ -14,23 +14,6 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class ProductService {
-    /**
-     * #### FR-PR-001: 상품 목록 조회
-     * - **설명**: 사용자가 판매 중인 상품 목록을 조회할 수 있다
-     * - **입력**: 페이지 정보 (선택)
-     * - **출력**: 상품 목록
-     *
-     * #### FR-PR-002: 상품 상세 조회
-     * - **설명**: 사용자가 특정 상품의 상세 정보를 조회할 수 있다
-     * - **입력**: 상품 ID
-     * - **출력**: 상품 상세 정보
-     *
-     * #### FR-PR-003: 실시간 재고 조회
-     * - **설명**: 사용자가 특정 상품의 현재 재고를 실시간으로 조회할 수 있다
-     * - **입력**: 상품 ID
-     * - **출력**: 현재 재고 수량
-     * */
-
     private final ProductRepository productRepository;
 
     public Page<Product> getProductList(Pageable pageable) {
@@ -40,6 +23,10 @@ public class ProductService {
     public Product getProduct(Long id) {
         return productRepository.findById(id)
                 .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND, "ID: " + id));
+    }
+
+    public List<Product> getProductList(List<Long> ids) {
+        return productRepository.findByIdsIn(ids);
     }
 
     public Product getProductStock(Long id) {

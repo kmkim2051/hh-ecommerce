@@ -9,6 +9,7 @@ import java.util.Optional;
 public interface ProductRepository {
     Page<Product> findAll(Pageable pageable);
     Optional<Product> findById(Long id);
+    List<Product> findByIdsIn(List<Long> ids);
     List<Product> findTopByViewCount(Integer limit);
     List<Product> findTopBySalesCount(Integer limit);
 }
