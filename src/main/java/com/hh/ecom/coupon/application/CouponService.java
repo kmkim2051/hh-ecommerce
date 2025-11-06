@@ -117,23 +117,6 @@ public class CouponService {
         return couponUserRepository.save(usedCouponUser);
     }
 
-    @Transactional
-    public void cancelCouponUsage(Long couponUserId) {
-        // 1. 발급받은 쿠폰 조회
-        CouponUser couponUser = couponUserRepository.findById(couponUserId)
-                .orElseThrow(() -> new CouponException(CouponErrorCode.COUPON_USER_NOT_FOUND));
-
-        // 2. 쿠폰 사용 취소
-        CouponUser canceledCouponUser = couponUser.cancelUsage();
-        couponUserRepository.save(canceledCouponUser);
-
-        // 3. 쿠폰 수량 복원
-        Coupon coupon = couponRepository.findById(couponUser.getCouponId())
-                .orElseThrow(() -> new CouponException(CouponErrorCode.COUPON_NOT_FOUND));
-        Coupon increasedCoupon = coupon.increaseQuantity();
-        couponRepository.save(increasedCoupon);
-    }
-
     public Coupon getCoupon(Long couponId) {
         return couponRepository.findById(couponId)
                 .orElseThrow(() -> new CouponException(CouponErrorCode.COUPON_NOT_FOUND, "couponId: " + couponId));
