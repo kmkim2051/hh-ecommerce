@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'jacoco'
     id 'org.springframework.boot' version '3.5.7'
     id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -12,6 +13,25 @@ java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(17)
     }
+}
+
+jacoco {
+    toolVersion = "0.8.11" // 최신 버전 권장
+}
+
+jacocoTestReport {
+    dependsOn test // 테스트가 먼저 실행되도록
+    reports {
+        html.required.set(true)
+        xml.required.set(true)
+        csv.required.set(false)
+        html.outputLocation.set(layout.buildDirectory.dir("jacocoHtml"))
+    }
+}
+
+test {
+    useJUnitPlatform()
+    finalizedBy jacocoTestReport // 테스트 후 리포트 자동 생성
 }
 
 configurations {
