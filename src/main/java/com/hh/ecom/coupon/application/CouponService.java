@@ -6,10 +6,12 @@ import com.hh.ecom.coupon.domain.CouponUser;
 import com.hh.ecom.coupon.domain.CouponUserRepository;
 import com.hh.ecom.coupon.domain.exception.CouponErrorCode;
 import com.hh.ecom.coupon.domain.exception.CouponException;
+import com.hh.ecom.coupon.domain.exception.OptimisticLockException;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,47 +19,63 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CouponService {
-    /**
-     * ### FR-C-001: 선착순 쿠폰 발급
-     * - 설명: 사용자가 선착순으로 쿠폰을 발급받을 수 있다
-     * - 입력: 사용자 ID, 쿠폰 ID
-     * - 출력: 발급된 쿠폰 정보
-     * - 비고:
-     *   - 수량이 소진되면 발급 불가
-     *   - 동일 쿠폰 중복 발급 불가
-     *   - 낙관적 락 또는 비관적 락 기반 동시성 제어
-     *
-     * ### FR-C-002: 보유 쿠폰 조회
-     * - 설명: 사용자가 보유한 쿠폰 목록을 조회할 수 있다
-     * - 입력: 사용자 ID
-     * - 출력: 미사용 쿠폰 목록
-     */
+    private static final int MAX_RETRY_COUNT = 3;
+    private static final long RETRY_DELAY_MS = 50;
 
     private final CouponRepository couponRepository;
     private final CouponUserRepository couponUserRepository;
 
-    /**
-     * 발급 가능한 쿠폰 목록 조회
-     */
     public List<Coupon> getAvailableCoupons() {
         return couponRepository.findAllIssuable();
     }
 
-    /**
-     * 모든 쿠폰 목록 조회
-     */
     public List<Coupon> getAllCoupons() {
         return couponRepository.findAll();
     }
 
-    /**
-     * FR-C-001: 선착순 쿠폰 발급
-     */
     @Transactional
     public CouponUser issueCoupon(Long userId, Long couponId) {
+        int retryCount = 0;
+
+        while (retryCount < MAX_RETRY_COUNT) {
+            try {
+                return tryIssueCoupon(userId, couponId);
+            } catch (OptimisticLockException e) {
+                retryCount++;
+
+                if (retryCount >= MAX_RETRY_COUNT) {
+                    log.warn("쿠폰 발급 최대 재시도 횟수 초과. userId={}, couponId={}, retryCount={}",
+                            userId, couponId, retryCount);
+                    throw new CouponException(CouponErrorCode.COUPON_ISSUE_FAILED,
+                            "동시 요청이 많아 쿠폰 발급에 실패했습니다. 다시 시도해주세요.");
+                }
+
+                // Exponential backoff
+                try {
+                    Thread.sleep(RETRY_DELAY_MS * retryCount);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new CouponException(CouponErrorCode.COUPON_ISSUE_FAILED,
+                            "쿠폰 발급 중 인터럽트가 발생했습니다.");
+                }
+
+                log.debug("쿠폰 발급 재시도. userId={}, couponId={}, retryCount={}",
+                        userId, couponId, retryCount);
+            }
+        }
+
+        throw new CouponException(CouponErrorCode.COUPON_ISSUE_FAILED,
+                "쿠폰 발급에 실패했습니다.");
+    }
+
+    /**
+     * 실제 쿠폰 발급 로직 (낙관적 락 적용)
+     */
+    private CouponUser tryIssueCoupon(Long userId, Long couponId) {
         // 1. 쿠폰 조회
         Coupon coupon = couponRepository.findById(couponId)
                 .orElseThrow(() -> new CouponException(CouponErrorCode.COUPON_NOT_FOUND, "couponId: " + couponId));
@@ -71,18 +89,17 @@ public class CouponService {
                     throw new CouponException(CouponErrorCode.COUPON_ALREADY_ISSUED);
                 });
 
-        // 4. 쿠폰 수량 차감
+        // 4. 쿠폰 수량 차감 (버전 자동 증가)
         Coupon decreasedCoupon = coupon.decreaseQuantity();
+
+        // 5. 쿠폰 저장 (낙관적 락 검증 - 버전 충돌 시 OptimisticLockException 발생)
         couponRepository.save(decreasedCoupon);
 
-        // 5. 쿠폰 발급 기록
+        // 6. 쿠폰 발급 기록
         CouponUser couponUser = CouponUser.issue(userId, couponId, coupon.getEndDate());
         return couponUserRepository.save(couponUser);
     }
 
-    /**
-     * FR-C-002: 보유 쿠폰 조회 (미사용만)
-     */
     public List<CouponUserWithCoupon> getMyCoupons(Long userId) {
         List<CouponUser> couponUsers = couponUserRepository.findByUserIdAndIsUsed(userId, false);
 
