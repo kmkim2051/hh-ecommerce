@@ -46,6 +46,9 @@ public class PointTransaction {
                     "거래 금액은 0보다 커야 합니다. 입력값: " + amount);
         }
     }
+    public boolean isNew() {
+        return id == null;
+    }
 
     public boolean isCharge() {
         return type == TransactionType.CHARGE;

@@ -17,7 +17,10 @@ public enum PointErrorCode {
 
     // 트랜잭션 관련
     TRANSACTION_NOT_FOUND("PT200", "포인트 거래 내역을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
-    INVALID_TRANSACTION_TYPE("PT201", "유효하지 않은 거래 유형입니다.", HttpStatus.BAD_REQUEST);
+    INVALID_TRANSACTION_TYPE("PT201", "유효하지 않은 거래 유형입니다.", HttpStatus.BAD_REQUEST),
+
+    // 동시성 제어 관련
+    OPTIMISTIC_LOCK_FAILURE("PT300", "동시에 처리 중인 요청이 있습니다. 다시 시도해주세요.", HttpStatus.CONFLICT);
 
     private final String code;
     private final String message;

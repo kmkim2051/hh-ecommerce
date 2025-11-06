@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.function.Supplier;
 
 /**
  * In-Memory DB를 위한 POJO entity
@@ -39,15 +40,17 @@ public class PointTransactionEntity {
                 .build();
     }
 
-    public static PointTransactionEntity from(PointTransaction transaction) {
+    public static PointTransactionEntity from(PointTransaction tx, Supplier<Long> idGenerator) {
+        Long id = !(tx.isNew()) ? tx.getId() : idGenerator.get();
+
         return PointTransactionEntity.builder()
-                .id(transaction.getId())
-                .pointId(transaction.getPointId())
-                .amount(transaction.getAmount())
-                .type(transaction.getType())
-                .orderId(transaction.getOrderId())
-                .balanceAfter(transaction.getBalanceAfter())
-                .createdAt(transaction.getCreatedAt())
+                .id(id)
+                .pointId(tx.getPointId())
+                .amount(tx.getAmount())
+                .type(tx.getType())
+                .orderId(tx.getOrderId())
+                .balanceAfter(tx.getBalanceAfter())
+                .createdAt(tx.getCreatedAt())
                 .build();
     }
 }
