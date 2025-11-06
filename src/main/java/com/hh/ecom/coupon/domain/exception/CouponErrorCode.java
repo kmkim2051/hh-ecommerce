@@ -16,6 +16,7 @@ public enum CouponErrorCode {
     COUPON_NOT_ACTIVE("CP103", "쿠폰이 활성화 상태가 아닙니다.", HttpStatus.BAD_REQUEST),
     COUPON_ALREADY_ISSUED("CP104", "이미 발급받은 쿠폰입니다.", HttpStatus.CONFLICT),
     INVALID_QUANTITY("CP105", "유효하지 않은 수량입니다.", HttpStatus.BAD_REQUEST),
+    OPTIMISTIC_LOCK_CONFLICT("CP106", "동시에 쿠폰 발급 요청이 처리되었습니다. 다시 시도해주세요.", HttpStatus.CONFLICT),
 
     // 쿠폰 사용 관련
     COUPON_USER_NOT_FOUND("CP201", "발급받은 쿠폰을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
