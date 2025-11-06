@@ -63,20 +63,4 @@ public interface OrderApi {
             @Parameter(description = "주문 ID", required = true)
             Long id
     );
-
-    @Operation(
-            summary = "주문 전체 취소",
-            description = "주문을 취소하고 사용한 포인트를 환불합니다."
-    )
-    @ApiResponses(value = {
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "취소 성공",
-                    content = @Content(schema = @Schema(implementation = Map.class))
-            )
-    })
-    ResponseEntity<Map<String, Object>> cancelOrder(
-            @Parameter(description = "주문 ID", required = true)
-            Long id
-    );
 }

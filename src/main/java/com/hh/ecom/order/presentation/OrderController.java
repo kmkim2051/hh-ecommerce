@@ -94,19 +94,4 @@ public class OrderController implements OrderApi {
 
         return ResponseEntity.ok(response);
     }
-
-    @Override
-    @PostMapping("/{id}/cancel")
-    public ResponseEntity<Map<String, Object>> cancelOrder(@PathVariable Long id) {
-        Map<String, Object> response = new HashMap<>();
-
-        response.put("id", id);
-        response.put("orderNumber", "ORDER-" + id);
-        response.put("status", "CANCELED");
-        response.put("refundAmount", 1570000);
-        response.put("canceledAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
-        response.put("message", "주문이 취소되었습니다. 포인트가 환불되었습니다.");
-
-        return ResponseEntity.ok(response);
-    }
 }
