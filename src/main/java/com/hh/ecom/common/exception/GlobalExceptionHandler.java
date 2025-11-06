@@ -1,5 +1,8 @@
 package com.hh.ecom.common.exception;
 
+import com.hh.ecom.cart.domain.exception.CartException;
+import com.hh.ecom.coupon.domain.exception.CouponException;
+import com.hh.ecom.order.domain.exception.OrderException;
 import com.hh.ecom.point.domain.exception.PointException;
 import com.hh.ecom.product.domain.exception.ProductException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,7 +42,72 @@ public class GlobalExceptionHandler {
         log.warn("PointException occurred: code={}, message={}, path={}",
                 e.getCode(), e.getMessage(), request.getRequestURI(), e);
 
-        return buildErrorResponseEntity(e, request);
+        ErrorResponse errorResponse = ErrorResponse.of(
+                e.getCode(),
+                e.getMessage(),
+                request.getRequestURI()
+        );
+
+        return ResponseEntity
+                .status(e.getErrorCode().getHttpStatus())
+                .body(errorResponse);
+    }
+
+    @ExceptionHandler(CouponException.class)
+    public ResponseEntity<ErrorResponse> handleCouponException(
+            CouponException e,
+            HttpServletRequest request
+    ) {
+        log.warn("CouponException occurred: code={}, message={}, path={}",
+                e.getCode(), e.getMessage(), request.getRequestURI(), e);
+
+        ErrorResponse errorResponse = ErrorResponse.of(
+                e.getCode(),
+                e.getMessage(),
+                request.getRequestURI()
+        );
+
+        return ResponseEntity
+                .status(e.getErrorCode().getHttpStatus())
+                .body(errorResponse);
+    }
+
+    @ExceptionHandler(OrderException.class)
+    public ResponseEntity<ErrorResponse> handleOrderException(
+            OrderException e,
+            HttpServletRequest request
+    ) {
+        log.warn("OrderException occurred: code={}, message={}, path={}",
+                e.getCode(), e.getMessage(), request.getRequestURI(), e);
+
+        ErrorResponse errorResponse = ErrorResponse.of(
+                e.getCode(),
+                e.getMessage(),
+                request.getRequestURI()
+        );
+
+        return ResponseEntity
+                .status(e.getErrorCode().getHttpStatus())
+                .body(errorResponse);
+    }
+
+    @ExceptionHandler(CartException.class)
+    public ResponseEntity<ErrorResponse> handleCartException(
+            CartException e,
+            HttpServletRequest request
+    ) {
+        log.warn("CartException occurred: code={}, message={}, path={}",
+                e.getCode(), e.getMessage(), request.getRequestURI(), e);
+
+        ErrorResponse errorResponse = ErrorResponse.of(
+                e.getCode(),
+                e.getMessage(),
+                request.getRequestURI()
+        );
+
+        return ResponseEntity
+                .status(e.getErrorCode().getHttpStatus())
+                .body(errorResponse);
     }
 
     @ExceptionHandler(Exception.class)
@@ -58,18 +126,6 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .internalServerError()
-                .body(errorResponse);
-    }
-
-    private static ResponseEntity<ErrorResponse> buildErrorResponseEntity(PointException e, HttpServletRequest request) {
-        ErrorResponse errorResponse = ErrorResponse.of(
-                e.getCode(),
-                e.getMessage(),
-                request.getRequestURI()
-        );
-
-        return ResponseEntity
-                .status(e.getErrorCode().getHttpStatus())
                 .body(errorResponse);
     }
 }
