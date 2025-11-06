@@ -5,6 +5,8 @@ import com.hh.ecom.cart.domain.CartItemRepository;
 import com.hh.ecom.cart.domain.exception.CartErrorCode;
 import com.hh.ecom.cart.domain.exception.CartException;
 import com.hh.ecom.cart.infrastructure.persistence.CartItemInMemoryRepository;
+import com.hh.ecom.order.domain.OrderItemRepository;
+import com.hh.ecom.order.infrastructure.OrderItemInMemoryRepository;
 import com.hh.ecom.product.domain.Product;
 import com.hh.ecom.product.domain.ProductRepository;
 import com.hh.ecom.product.domain.exception.ProductErrorCode;
@@ -30,13 +32,15 @@ class CartServiceIntegrationTest {
 
     private CartItemRepository cartItemRepository;
     private ProductRepository productRepository;
+    private OrderItemRepository orderItemRepository;
     private CartService cartService;
 
     @BeforeEach
     void setUp() throws Exception {
         // 실제 In-Memory Repository 인스턴스 생성
         cartItemRepository = new CartItemInMemoryRepository();
-        productRepository = new ProductInMemoryRepository();
+        orderItemRepository = new OrderItemInMemoryRepository();
+        productRepository = new ProductInMemoryRepository(orderItemRepository);
         cartService = new CartService(cartItemRepository, productRepository);
 
         // ProductRepository에 테스트 데이터 추가

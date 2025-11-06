@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -130,6 +131,10 @@ public class CouponService {
 
         public static CouponUserWithCoupon of(CouponUser couponUser, Coupon coupon) {
             return new CouponUserWithCoupon(couponUser, coupon);
+        }
+
+        public boolean isSameCouponId(Long couponId) {
+            return Objects.equals(coupon.getId(), couponId);
         }
     }
 }

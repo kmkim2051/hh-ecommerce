@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Getter
 @Builder(toBuilder = true)
@@ -59,7 +60,7 @@ public class CartItem {
     }
 
     public boolean belongsToUser(Long userId) {
-        return this.userId.equals(userId);
+        return Objects.equals(this.userId, userId);
     }
 
     public boolean isSameProduct(Long productId) {
