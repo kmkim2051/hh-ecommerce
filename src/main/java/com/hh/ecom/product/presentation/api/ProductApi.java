@@ -1,7 +1,8 @@
 package com.hh.ecom.product.presentation.api;
 
-
-import com.hh.ecom.product.domain.Product;
+import com.hh.ecom.product.presentation.dto.response.ProductListResponse;
+import com.hh.ecom.product.presentation.dto.response.ProductResponse;
+import com.hh.ecom.product.presentation.dto.response.ProductStockResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -9,10 +10,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
-
-import java.util.List;
 
 @Tag(name = "Product", description = "상품 관리 API")
 public interface ProductApi {
@@ -25,10 +23,10 @@ public interface ProductApi {
             @ApiResponse(
                     responseCode = "200",
                     description = "조회 성공",
-                    content = @Content(schema = @Schema(implementation = Product.class))
+                    content = @Content(schema = @Schema(implementation = ProductListResponse.class))
             )
     })
-    ResponseEntity<Page<Product>> getProducts(
+    ResponseEntity<ProductListResponse> getProducts(
             @Parameter(description = "페이지 번호 (0부터 시작)", example = "0")
             Integer page,
             @Parameter(description = "페이지 크기", example = "20")
@@ -43,10 +41,10 @@ public interface ProductApi {
             @ApiResponse(
                     responseCode = "200",
                     description = "조회 성공",
-                    content = @Content(schema = @Schema(implementation = Product.class))
+                    content = @Content(schema = @Schema(implementation = ProductResponse.class))
             )
     })
-    ResponseEntity<Product> getProduct(
+    ResponseEntity<ProductResponse> getProduct(
             @Parameter(description = "상품 ID", required = true)
             Long id
     );
@@ -59,10 +57,10 @@ public interface ProductApi {
             @ApiResponse(
                     responseCode = "200",
                     description = "조회 성공",
-                    content = @Content(schema = @Schema(implementation = Product.class))
+                    content = @Content(schema = @Schema(implementation = ProductStockResponse.class))
             )
     })
-    ResponseEntity<Product> getProductStock(
+    ResponseEntity<ProductStockResponse> getProductStock(
             @Parameter(description = "상품 ID", required = true)
             Long id
     );
@@ -75,10 +73,10 @@ public interface ProductApi {
             @ApiResponse(
                     responseCode = "200",
                     description = "조회 성공",
-                    content = @Content(schema = @Schema(implementation = Product.class))
+                    content = @Content(schema = @Schema(implementation = ProductListResponse.class))
             )
     })
-    ResponseEntity<List<Product>> getProductsByViewCount(
+    ResponseEntity<ProductListResponse> getProductsByViewCount(
             @Parameter(description = "조회할 상품 개수", required = false)
             Integer limit
     );
@@ -91,10 +89,10 @@ public interface ProductApi {
             @ApiResponse(
                     responseCode = "200",
                     description = "조회 성공",
-                    content = @Content(schema = @Schema(implementation = Product.class))
+                    content = @Content(schema = @Schema(implementation = ProductListResponse.class))
             )
     })
-    ResponseEntity<List<Product>> getProductsBySalesCount(
+    ResponseEntity<ProductListResponse> getProductsBySalesCount(
             @Parameter(description = "조회할 상품 개수", required = false)
             Integer limit
     );
