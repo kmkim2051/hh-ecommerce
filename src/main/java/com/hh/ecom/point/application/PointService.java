@@ -19,31 +19,9 @@ import java.util.List;
 public class PointService {
     private static final int POINT_CHARGE_MAX_RETRY_COUNT = 3;
 
-    /**
-     * ### FR-P-001: 포인트 충전
-     * - 설명: 사용자가 포인트를 충전하여 잔액을 증가시킬 수 있다
-     * - 입력: 사용자 ID, 충전 금액
-     * - 출력: 충전 후 잔액
-     * - 비고: 충전 이력이 기록되어야 한다
-     *
-     * ### FR-P-002: 포인트 조회
-     * - 설명: 사용자가 현재 포인트 잔액을 조회할 수 있다
-     * - 입력: 사용자 ID
-     * - 출력: 현재 잔액
-     *
-     * ### FR-P-003: 포인트 사용 이력 조회
-     * - 설명: 사용자가 포인트 충전/사용/환불 이력을 조회할 수 있다
-     * - 입력: 사용자 ID
-     * - 출력: 거래 내역 목록 (거래 유형, 금액, 거래 후 잔액, 거래 시간)
-     */
-
     private final PointRepository pointRepository;
     private final PointTransactionRepository transactionRepository;
 
-    /**
-     * FR-P-001: 포인트 충전
-     * 낙관적 락을 적용하여 동시성 제어
-     */
     @Transactional
     public Point chargePoint(Long userId, BigDecimal amount) {
         int retryCount = 0;
@@ -95,25 +73,16 @@ public class PointService {
         throw new PointException(PointErrorCode.OPTIMISTIC_LOCK_FAILURE);
     }
 
-    /**
-     * FR-P-002: 포인트 조회
-     */
     public Point getPoint(Long userId) {
         return pointRepository.findByUserId(userId)
                 .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND, "userId: " + userId));
     }
 
-    /**
-     * FR-P-002: 포인트 ID로 조회 (내부용)
-     */
     public Point getPointById(Long pointId) {
         return pointRepository.findById(pointId)
                 .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND, "pointId: " + pointId));
     }
 
-    /**
-     * FR-P-003: 포인트 사용 이력 조회
-     */
     public List<PointTransaction> getTransactionHistory(Long userId) {
         // 1. 포인트 계좌 조회
         Point point = pointRepository.findByUserId(userId)
@@ -123,10 +92,6 @@ public class PointService {
         return transactionRepository.findByPointId(point.getId());
     }
 
-    /**
-     * 포인트 사용 (주문 시 사용)
-     * 낙관적 락을 적용하여 동시성 제어
-     */
     @Transactional
     public Point usePoint(Long userId, BigDecimal amount, Long orderId) {
         int retryCount = 0;
@@ -178,10 +143,6 @@ public class PointService {
         throw new PointException(PointErrorCode.OPTIMISTIC_LOCK_FAILURE);
     }
 
-    /**
-     * 포인트 환불 (주문 취소 시 사용)
-     * 낙관적 락을 적용하여 동시성 제어
-     */
     @Transactional
     public Point refundPoint(Long userId, BigDecimal amount, Long orderId) {
         int retryCount = 0;
@@ -230,9 +191,6 @@ public class PointService {
         throw new PointException(PointErrorCode.OPTIMISTIC_LOCK_FAILURE);
     }
 
-    /**
-     * 포인트 계좌 존재 여부 확인
-     */
     public boolean hasPointAccount(Long userId) {
         return pointRepository.findByUserId(userId).isPresent();
     }

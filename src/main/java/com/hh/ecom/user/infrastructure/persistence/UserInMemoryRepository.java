@@ -18,9 +18,7 @@ public class UserInMemoryRepository implements UserRepository {
     @Override
     public User save(User user) {
         UserEntity entity;
-
         if (user.getId() == null) {
-            // 새로운 사용자 생성
             Long newId = idGenerator.getAndIncrement();
             entity = UserEntity.builder()
                     .id(newId)
@@ -28,10 +26,8 @@ public class UserInMemoryRepository implements UserRepository {
                     .createdAt(user.getCreatedAt())
                     .build();
         } else {
-            // 기존 사용자 업데이트 (현재는 사용 안 함)
             entity = UserEntity.from(user);
         }
-
         users.put(entity.getId(), entity);
         return entity.toDomain();
     }

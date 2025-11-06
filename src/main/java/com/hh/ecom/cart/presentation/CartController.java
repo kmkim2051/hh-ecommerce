@@ -17,12 +17,8 @@ import java.util.List;
 @RequestMapping("/cart-items")
 @RequiredArgsConstructor
 public class CartController implements CartApi {
-
     private final CartService cartService;
 
-    /**
-     * FR-CA-004: 장바구니 조회
-     */
     @Override
     @GetMapping
     public ResponseEntity<CartItemListResponse> getCartItems(
@@ -32,9 +28,6 @@ public class CartController implements CartApi {
         return ResponseEntity.ok(CartItemListResponse.from(cartItems));
     }
 
-    /**
-     * FR-CA-001: 장바구니 상품 추가
-     */
     @Override
     @PostMapping
     public ResponseEntity<CartItemMessageResponse> addCartItem(
@@ -47,9 +40,6 @@ public class CartController implements CartApi {
         );
     }
 
-    /**
-     * FR-CA-002: 장바구니 수량 변경
-     */
     @Override
     @PatchMapping("/{id}")
     public ResponseEntity<CartItemMessageResponse> updateCartItemQuantity(
@@ -63,9 +53,6 @@ public class CartController implements CartApi {
         );
     }
 
-    /**
-     * FR-CA-003: 장바구니 상품 삭제
-     */
     @Override
     @DeleteMapping("/{id}")
     public ResponseEntity<CartItemMessageResponse> deleteCartItem(
