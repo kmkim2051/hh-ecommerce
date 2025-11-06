@@ -21,6 +21,7 @@ public class PointEntity {
     private Long id;
     private Long userId;
     private BigDecimal balance;
+    private Long version; // 낙관적 락을 위한 버전 필드
     private LocalDateTime updatedAt;
 
     public Point toDomain() {
@@ -28,6 +29,7 @@ public class PointEntity {
                 .id(this.id)
                 .userId(this.userId)
                 .balance(this.balance)
+                .version(this.version)
                 .updatedAt(this.updatedAt)
                 .build();
     }
@@ -37,6 +39,7 @@ public class PointEntity {
                 .id(point.getId())
                 .userId(point.getUserId())
                 .balance(point.getBalance())
+                .version(point.getVersion())
                 .updatedAt(point.getUpdatedAt())
                 .build();
     }

@@ -17,6 +17,7 @@ public class Point {
     private final Long id;
     private final Long userId;
     private final BigDecimal balance;
+    private final Long version; // 낙관적 락을 위한 버전 필드
     private final LocalDateTime updatedAt;
 
     public static Point create(Long userId) {
@@ -24,12 +25,16 @@ public class Point {
         return Point.builder()
                 .userId(userId)
                 .balance(BigDecimal.ZERO)
+                .version(0L)
                 .updatedAt(now)
                 .build();
     }
 
     private Point withUpdate(PointBuilder builder) {
-        return builder.updatedAt(LocalDateTime.now()).build();
+        return builder
+                .version(this.version + 1) // 버전 증가
+                .updatedAt(LocalDateTime.now())
+                .build();
     }
 
     public boolean hasEnoughBalance(BigDecimal amount) {
