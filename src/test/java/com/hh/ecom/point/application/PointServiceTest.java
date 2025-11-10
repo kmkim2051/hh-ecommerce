@@ -1,0 +1,358 @@
+package com.hh.ecom.point.application;
+
+import com.hh.ecom.point.domain.Point;
+import com.hh.ecom.point.domain.PointRepository;
+import com.hh.ecom.point.domain.PointTransaction;
+import com.hh.ecom.point.domain.PointTransactionRepository;
+import com.hh.ecom.point.domain.TransactionType;
+import com.hh.ecom.point.domain.exception.PointErrorCode;
+import com.hh.ecom.point.domain.exception.PointException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("PointService 단위 테스트")
+class PointServiceTest {
+
+    @Mock
+    private PointRepository pointRepository;
+
+    @Mock
+    private PointTransactionRepository transactionRepository;
+
+    @InjectMocks
+    private PointService pointService;
+
+    private Point testPoint;
+    private Long userId;
+
+    @BeforeEach
+    void setUp() {
+        userId = 1L;
+        testPoint = Point.builder()
+                .id(1L)
+                .userId(userId)
+                .balance(BigDecimal.ZERO)
+                .version(0L)
+                .updatedAt(java.time.LocalDateTime.now())
+                .build();
+    }
+
+    @Nested
+    @DisplayName("포인트 충전 테스트")
+    class ChargePointTest {
+
+        @Test
+        @DisplayName("포인트 계좌가 없으면 새로 생성하고 충전한다")
+        void chargePoint_createNewAccount() {
+            // given
+            BigDecimal amount = BigDecimal.valueOf(10000);
+            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.empty());
+
+            given(pointRepository.save(any(Point.class))).willAnswer(invocation -> {
+                Point point = invocation.getArgument(0);
+                if (point.getId() == null) {
+                    // 새로 생성되는 경우 ID 부여
+                    return point.toBuilder().id(1L).build();
+                }
+                return point;
+            });
+
+            given(transactionRepository.save(any(PointTransaction.class)))
+                    .willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            Point result = pointService.chargePoint(userId, amount);
+
+            // then
+            assertThat(result).isNotNull();
+            verify(pointRepository, times(2)).save(any(Point.class)); // 생성 + 충전
+            verify(transactionRepository).save(any(PointTransaction.class));
+        }
+
+        @Test
+        @DisplayName("기존 포인트 계좌에 충전한다")
+        void chargePoint_existingAccount() {
+            // given
+            BigDecimal amount = BigDecimal.valueOf(5000);
+            Point existingPoint = testPoint.toBuilder().balance(BigDecimal.valueOf(10000)).build();
+
+            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.of(existingPoint));
+
+            Point chargedPoint = existingPoint.charge(amount);
+            given(pointRepository.save(any(Point.class))).willReturn(chargedPoint);
+            given(transactionRepository.save(any(PointTransaction.class)))
+                    .willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            pointService.chargePoint(userId, amount);
+
+            // then
+            verify(pointRepository).save(any(Point.class));
+
+            ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
+            verify(transactionRepository).save(captor.capture());
+
+            PointTransaction savedTransaction = captor.getValue();
+            assertThat(savedTransaction.getType()).isEqualTo(TransactionType.CHARGE);
+            assertThat(savedTransaction.getAmount()).isEqualTo(amount);
+        }
+
+        @Test
+        @DisplayName("0 이하의 금액으로 충전 시 예외가 발생한다")
+        void chargePoint_invalidAmount() {
+            // given
+            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.of(testPoint));
+
+            // when & then
+            assertThatThrownBy(() -> pointService.chargePoint(userId, BigDecimal.ZERO))
+                    .isInstanceOf(PointException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(PointErrorCode.INVALID_AMOUNT);
+        }
+    }
+
+    @Nested
+    @DisplayName("포인트 조회 테스트")
+    class GetPointTest {
+
+        @Test
+        @DisplayName("사용자 ID로 포인트 계좌를 조회한다")
+        void getPoint_success() {
+            // given
+            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.of(testPoint));
+
+            // when
+            Point result = pointService.getPoint(userId);
+
+            // then
+            assertThat(result).isNotNull();
+            assertThat(result.getUserId()).isEqualTo(userId);
+            verify(pointRepository).findByUserId(userId);
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 사용자의 포인트 조회 시 예외가 발생한다")
+        void getPoint_notFound() {
+            // given
+            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> pointService.getPoint(userId))
+                    .isInstanceOf(PointException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(PointErrorCode.POINT_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("포인트 ID로 조회한다")
+        void getPointById_success() {
+            // given
+            Long pointId = 1L;
+            given(pointRepository.findById(anyLong())).willReturn(Optional.of(testPoint));
+
+            // when
+            Point result = pointService.getPointById(pointId);
+
+            // then
+            assertThat(result).isNotNull();
+            verify(pointRepository).findById(pointId);
+        }
+    }
+
+    @Nested
+    @DisplayName("포인트 거래 이력 조회 테스트")
+    class GetTransactionHistoryTest {
+
+        @Test
+        @DisplayName("사용자의 거래 이력을 조회한다")
+        void getTransactionHistory_success() {
+            // given
+            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.of(testPoint));
+
+            List<PointTransaction> transactions = List.of(
+                    PointTransaction.create(testPoint.getId(), BigDecimal.valueOf(10000),
+                            TransactionType.CHARGE, null, BigDecimal.valueOf(10000)),
+                    PointTransaction.create(testPoint.getId(), BigDecimal.valueOf(3000),
+                            TransactionType.USE, 1L, BigDecimal.valueOf(7000))
+            );
+            given(transactionRepository.findByPointId(anyLong())).willReturn(transactions);
+
+            // when
+            List<PointTransaction> result = pointService.getTransactionHistory(userId);
+
+            // then
+            assertThat(result).hasSize(2);
+            assertThat(result.get(0).getType()).isEqualTo(TransactionType.CHARGE);
+            assertThat(result.get(1).getType()).isEqualTo(TransactionType.USE);
+            verify(transactionRepository).findByPointId(testPoint.getId());
+        }
+
+        @Test
+        @DisplayName("포인트 계좌가 없으면 예외가 발생한다")
+        void getTransactionHistory_pointNotFound() {
+            // given
+            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> pointService.getTransactionHistory(userId))
+                    .isInstanceOf(PointException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(PointErrorCode.POINT_NOT_FOUND);
+        }
+    }
+
+    @Nested
+    @DisplayName("포인트 사용 테스트")
+    class UsePointTest {
+
+        @Test
+        @DisplayName("포인트를 사용한다")
+        void usePoint_success() {
+            // given
+            BigDecimal amount = BigDecimal.valueOf(3000);
+            Long orderId = 1L;
+            Point chargedPoint = testPoint.toBuilder().balance(BigDecimal.valueOf(10000)).build();
+
+            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.of(chargedPoint));
+
+            Point usedPoint = chargedPoint.use(amount);
+            given(pointRepository.save(any(Point.class))).willReturn(usedPoint);
+            given(transactionRepository.save(any(PointTransaction.class)))
+                    .willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            pointService.usePoint(userId, amount, orderId);
+
+            // then
+            verify(pointRepository).save(any(Point.class));
+
+            ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
+            verify(transactionRepository).save(captor.capture());
+
+            PointTransaction savedTransaction = captor.getValue();
+            assertThat(savedTransaction.getType()).isEqualTo(TransactionType.USE);
+            assertThat(savedTransaction.getOrderId()).isEqualTo(orderId);
+        }
+
+        @Test
+        @DisplayName("잔액이 부족하면 예외가 발생한다")
+        void usePoint_insufficientBalance() {
+            // given
+            BigDecimal amount = BigDecimal.valueOf(10000);
+            Point lowBalancePoint = testPoint.toBuilder().balance(BigDecimal.valueOf(5000)).build();
+
+            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.of(lowBalancePoint));
+
+            // when & then
+            assertThatThrownBy(() -> pointService.usePoint(userId, amount, 1L))
+                    .isInstanceOf(PointException.class)
+                    .extracting("errorCode")
+                    .isEqualTo(PointErrorCode.INSUFFICIENT_BALANCE);
+        }
+    }
+
+    @Nested
+    @DisplayName("포인트 환불 테스트")
+    class RefundPointTest {
+
+        @Test
+        @DisplayName("포인트를 환불한다")
+        void refundPoint_success() {
+            // given
+            BigDecimal amount = BigDecimal.valueOf(3000);
+            Long orderId = 1L;
+            Point point = testPoint.toBuilder().balance(BigDecimal.valueOf(7000)).build();
+
+            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.of(point));
+
+            Point refundedPoint = point.refund(amount);
+            given(pointRepository.save(any(Point.class))).willReturn(refundedPoint);
+            given(transactionRepository.save(any(PointTransaction.class)))
+                    .willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            pointService.refundPoint(userId, amount, orderId);
+
+            // then
+            verify(pointRepository).save(any(Point.class));
+
+            ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
+            verify(transactionRepository).save(captor.capture());
+
+            PointTransaction savedTransaction = captor.getValue();
+            assertThat(savedTransaction.getType()).isEqualTo(TransactionType.REFUND);
+            assertThat(savedTransaction.getOrderId()).isEqualTo(orderId);
+        }
+
+        @Test
+        @DisplayName("잔액이 0인 상태에서도 환불할 수 있다")
+        void refundPoint_zeroBalance() {
+            // given
+            BigDecimal amount = BigDecimal.valueOf(5000);
+            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.of(testPoint));
+
+            Point refundedPoint = testPoint.refund(amount);
+            given(pointRepository.save(any(Point.class))).willReturn(refundedPoint);
+            given(transactionRepository.save(any(PointTransaction.class)))
+                    .willAnswer(invocation -> invocation.getArgument(0));
+
+            // when
+            Point result = pointService.refundPoint(userId, amount, 1L);
+
+            // then
+            verify(pointRepository).save(any(Point.class));
+            verify(transactionRepository).save(any(PointTransaction.class));
+        }
+    }
+
+    @Nested
+    @DisplayName("포인트 계좌 존재 여부 확인 테스트")
+    class HasPointAccountTest {
+
+        @Test
+        @DisplayName("포인트 계좌가 존재하면 true를 반환한다")
+        void hasPointAccount_exists() {
+            // given
+            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.of(testPoint));
+
+            // when
+            boolean result = pointService.hasPointAccount(userId);
+
+            // then
+            assertThat(result).isTrue();
+        }
+
+        @Test
+        @DisplayName("포인트 계좌가 없으면 false를 반환한다")
+        void hasPointAccount_notExists() {
+            // given
+            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.empty());
+
+            // when
+            boolean result = pointService.hasPointAccount(userId);
+
+            // then
+            assertThat(result).isFalse();
+        }
+    }
+}

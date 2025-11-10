@@ -1,0 +1,241 @@
+package com.hh.ecom.coupon.application;
+
+import com.hh.ecom.coupon.domain.Coupon;
+import com.hh.ecom.coupon.domain.CouponUser;
+import com.hh.ecom.coupon.domain.exception.CouponException;
+import com.hh.ecom.coupon.infrastructure.persistence.CouponInMemoryRepository;
+import com.hh.ecom.coupon.infrastructure.persistence.CouponUserInMemoryRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
+
+import static org.assertj.core.api.Assertions.*;
+
+@DisplayName("CouponService 동시성 테스트")
+class CouponServiceConcurrencyTest {
+
+    private CouponService couponService;
+    private CouponInMemoryRepository couponRepository;
+    private CouponUserInMemoryRepository couponUserRepository;
+
+    @BeforeEach
+    void setUp() {
+        couponRepository = new CouponInMemoryRepository();
+        couponUserRepository = new CouponUserInMemoryRepository();
+        couponService = new CouponService(couponRepository, couponUserRepository);
+
+        couponRepository.deleteAll();
+        couponUserRepository.deleteAll();
+    }
+
+    @Test
+    @DisplayName("동시에 여러 사용자가 쿠폰 발급 시도 - 수량 제한 검증")
+    void concurrentCouponIssuance_QuantityLimit() throws InterruptedException {
+        // given
+        int totalQuantity = 10;
+        int concurrentUsers = 50;
+
+        Coupon coupon = Coupon.create(
+                "선착순 쿠폰",
+                BigDecimal.valueOf(5000),
+                totalQuantity,
+                LocalDateTime.now(),
+                LocalDateTime.now().plusDays(30)
+        );
+        coupon = couponRepository.save(coupon);
+        final Long couponId = coupon.getId();
+
+        ExecutorService executorService = Executors.newFixedThreadPool(concurrentUsers);
+        CountDownLatch latch = new CountDownLatch(concurrentUsers);
+
+        AtomicInteger successCount = new AtomicInteger(0);
+        AtomicInteger failCount = new AtomicInteger(0);
+        List<Long> successUserIds = new CopyOnWriteArrayList<>();
+
+        // when - 50명의 사용자가 동시에 10개 쿠폰 발급 시도
+        IntStream.range(0, concurrentUsers).forEach(i -> {
+            executorService.submit(() -> {
+                try {
+                    Long userId = (long) (i + 1);
+                    couponService.issueCoupon(userId, couponId);
+                    successCount.incrementAndGet();
+                    successUserIds.add(userId);
+                } catch (CouponException e) {
+                    failCount.incrementAndGet();
+                } finally {
+                    latch.countDown();
+                }
+            });
+        });
+
+        latch.await(10, TimeUnit.SECONDS);
+        executorService.shutdown();
+        executorService.awaitTermination(10, TimeUnit.SECONDS);
+
+        // then - 정확히 10명만 발급 성공
+        System.out.println("=== 쿠폰 발급 테스트 결과 ===");
+        System.out.println("성공: " + successCount.get());
+        System.out.println("실패: " + failCount.get());
+        System.out.println("총 시도: " + concurrentUsers);
+
+        assertThat(successCount.get()).isEqualTo(totalQuantity);
+        assertThat(failCount.get()).isEqualTo(concurrentUsers - totalQuantity);
+        assertThat(successUserIds).hasSize(totalQuantity);
+
+        // 쿠폰 수량 확인
+        Coupon updatedCoupon = couponService.getCoupon(couponId);
+        assertThat(updatedCoupon.getAvailableQuantity()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("동일 사용자의 동시 중복 발급 시도 - 1개만 발급되어야 함")
+    void concurrentCouponIssuance_SameUser() throws InterruptedException {
+        // given
+        Coupon coupon = Coupon.create(
+                "중복 방지 테스트 쿠폰",
+                BigDecimal.valueOf(3000),
+                100,
+                LocalDateTime.now(),
+                LocalDateTime.now().plusDays(30)
+        );
+        coupon = couponRepository.save(coupon);
+        final Long couponId = coupon.getId();
+        final Long userId = 1L;
+
+        int concurrentAttempts = 10;
+        ExecutorService executorService = Executors.newFixedThreadPool(concurrentAttempts);
+        CountDownLatch latch = new CountDownLatch(concurrentAttempts);
+
+        AtomicInteger successCount = new AtomicInteger(0);
+        AtomicInteger failCount = new AtomicInteger(0);
+
+        // when - 같은 사용자가 동시에 10번 발급 시도
+        IntStream.range(0, concurrentAttempts).forEach(i -> {
+            executorService.submit(() -> {
+                try {
+                    couponService.issueCoupon(userId, couponId);
+                    successCount.incrementAndGet();
+                } catch (CouponException e) {
+                    failCount.incrementAndGet();
+                } finally {
+                    latch.countDown();
+                }
+            });
+        });
+
+        latch.await(10, TimeUnit.SECONDS);
+        executorService.shutdown();
+        executorService.awaitTermination(10, TimeUnit.SECONDS);
+
+        // then - 정확히 1개만 발급 성공
+        assertThat(successCount.get()).isEqualTo(1);
+        assertThat(failCount.get()).isEqualTo(concurrentAttempts - 1);
+
+        // 해당 사용자의 쿠폰 발급 내역 확인
+        List<CouponService.CouponUserWithCoupon> userCoupons = couponService.getMyCoupons(userId);
+        assertThat(userCoupons).hasSize(1);
+    }
+    @Test
+    @DisplayName("수량 1개 쿠폰에 대한 대량 동시 발급 시도")
+    void concurrentIssuance_SingleCoupon() throws InterruptedException {
+        // given - 수량 1개 쿠폰
+        Coupon coupon = Coupon.create(
+                "초특가 쿠폰",
+                BigDecimal.valueOf(10000),
+                1,
+                LocalDateTime.now(),
+                LocalDateTime.now().plusDays(30)
+        );
+        coupon = couponRepository.save(coupon);
+        final Long couponId = coupon.getId();
+
+        int concurrentUsers = 100;
+        ExecutorService executorService = Executors.newFixedThreadPool(concurrentUsers);
+        CountDownLatch latch = new CountDownLatch(concurrentUsers);
+
+        AtomicInteger successCount = new AtomicInteger(0);
+        ConcurrentLinkedQueue<Long> successUserIds = new ConcurrentLinkedQueue<>();
+
+        // when - 100명이 동시에 1개 쿠폰 발급 시도
+        IntStream.range(0, concurrentUsers).forEach(i -> {
+            executorService.submit(() -> {
+                try {
+                    Long userId = (long) (i + 1);
+                    couponService.issueCoupon(userId, couponId);
+                    successCount.incrementAndGet();
+                    successUserIds.add(userId);
+                } catch (CouponException e) {
+                    // 발급 실패
+                } finally {
+                    latch.countDown();
+                }
+            });
+        });
+
+        latch.await(10, TimeUnit.SECONDS);
+        executorService.shutdown();
+        executorService.awaitTermination(10, TimeUnit.SECONDS);
+
+        // then - 정확히 1명만 발급 성공
+        assertThat(successCount.get()).isEqualTo(1);
+        assertThat(successUserIds).hasSize(1);
+
+        // 쿠폰 수량 확인
+        Coupon finalCoupon = couponService.getCoupon(couponId);
+        assertThat(finalCoupon.getAvailableQuantity()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("순차적 발급 후 동시 조회 - 데이터 일관성 검증")
+    void sequentialIssuanceThenConcurrentQuery() throws InterruptedException {
+        // given
+        Coupon coupon = Coupon.create(
+                "일관성 테스트 쿠폰",
+                BigDecimal.valueOf(1500),
+                10,
+                LocalDateTime.now(),
+                LocalDateTime.now().plusDays(30)
+        );
+        coupon = couponRepository.save(coupon);
+        final Long couponId = coupon.getId();
+
+        // 순차적으로 10개 발급
+        for (long i = 1; i <= 10; i++) {
+            couponService.issueCoupon(i, couponId);
+        }
+
+        int queryThreads = 50;
+        ExecutorService executorService = Executors.newFixedThreadPool(queryThreads);
+        CountDownLatch latch = new CountDownLatch(queryThreads);
+
+        List<Integer> availableQuantities = new CopyOnWriteArrayList<>();
+
+        // when - 50개 스레드가 동시에 조회
+        IntStream.range(0, queryThreads).forEach(i -> {
+            executorService.submit(() -> {
+                try {
+                    Coupon queriedCoupon = couponService.getCoupon(couponId);
+                    availableQuantities.add(queriedCoupon.getAvailableQuantity());
+                } finally {
+                    latch.countDown();
+                }
+            });
+        });
+
+        latch.await(10, TimeUnit.SECONDS);
+        executorService.shutdown();
+        executorService.awaitTermination(10, TimeUnit.SECONDS);
+
+        // then - 모든 조회 결과가 동일해야 함 (수량 0)
+        assertThat(availableQuantities).hasSize(queryThreads);
+        assertThat(availableQuantities).allMatch(quantity -> quantity == 0);
+    }
+}
