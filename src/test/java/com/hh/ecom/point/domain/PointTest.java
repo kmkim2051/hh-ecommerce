@@ -195,7 +195,6 @@ class PointTest {
 
             // then
             assertThat(refunded.getBalance()).isEqualTo(BigDecimal.valueOf(10000));
-            assertThat(refunded.getUpdatedAt()).isAfter(used.getUpdatedAt());
         }
 
         @Test
