@@ -1,6 +1,6 @@
 package com.hh.ecom.coupon.presentation.dto.response;
 
-import com.hh.ecom.coupon.application.CouponService;
+import com.hh.ecom.coupon.domain.CouponUserWithCoupon;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -42,14 +42,14 @@ public class MyCouponResponse {
     @Schema(description = "만료일", example = "2025-12-31T23:59:59")
     private LocalDateTime expireDate;
 
-    public static MyCouponResponse from(CouponService.CouponUserWithCoupon couponUserWithCoupon) {
+    public static MyCouponResponse from(CouponUserWithCoupon couponUserWithCoupon) {
         return MyCouponResponse.builder()
                 .id(couponUserWithCoupon.getCouponUser().getId())
                 .userId(couponUserWithCoupon.getCouponUser().getUserId())
                 .couponId(couponUserWithCoupon.getCouponUser().getCouponId())
                 .couponName(couponUserWithCoupon.getCoupon().getName())
                 .discountAmount(couponUserWithCoupon.getCoupon().getDiscountAmount())
-                .isUsed(couponUserWithCoupon.getCouponUser().getIsUsed())
+                .isUsed(couponUserWithCoupon.getCouponUser().isUsed())
                 .issuedAt(couponUserWithCoupon.getCouponUser().getIssuedAt())
                 .usedAt(couponUserWithCoupon.getCouponUser().getUsedAt())
                 .expireDate(couponUserWithCoupon.getCouponUser().getExpireDate())
