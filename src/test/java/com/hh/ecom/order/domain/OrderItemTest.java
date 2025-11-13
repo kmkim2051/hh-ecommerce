@@ -1,6 +1,5 @@
 package com.hh.ecom.order.domain;
 
-import com.hh.ecom.order.domain.exception.OrderErrorCode;
 import com.hh.ecom.order.domain.exception.OrderException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

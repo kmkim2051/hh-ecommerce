@@ -8,74 +8,86 @@ import com.hh.ecom.point.domain.TransactionType;
 import com.hh.ecom.point.domain.exception.PointErrorCode;
 import com.hh.ecom.point.domain.exception.PointException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PointService {
-    private static final int POINT_CHARGE_MAX_RETRY_COUNT = 3;
-
     private final PointRepository pointRepository;
     private final PointTransactionRepository transactionRepository;
 
     @Transactional
     public Point chargePoint(Long userId, BigDecimal amount) {
-        int retryCount = 0;
+        return chargePointInternal(userId, amount);
+    }
 
-        while (retryCount < POINT_CHARGE_MAX_RETRY_COUNT) {
-            try {
-                // 1. 포인트 계좌 조회 또는 생성
-                Point point = pointRepository.findByUserId(userId)
-                        .orElseGet(() -> {
-                            Point newPoint = Point.create(userId);
-                            return pointRepository.save(newPoint);
-                        });
+    private Point chargePointInternal(Long userId, BigDecimal amount) {
+        try {
+            // 1. 포인트 계좌 조회 (비관적 락 적용)
+            Point point = pointRepository.findByUserIdForUpdate(userId)
+                    .orElseGet(() -> {
+                        // 계좌가 없으면 새로 생성
+                        Point newPoint = Point.createWithUserId(userId);
+                        return pointRepository.save(newPoint);
+                    });
 
-                // 2. 포인트 충전
-                Point chargedPoint = point.charge(amount);
-                Point savedPoint = pointRepository.save(chargedPoint);
+            // 2. 포인트 충전
+            Point chargedPoint = point.charge(amount);
+            Point savedPoint = pointRepository.save(chargedPoint);
 
-                // 3. 거래 이력 기록
-                PointTransaction transaction = PointTransaction.create(
-                        savedPoint.getId(),
-                        amount,
-                        TransactionType.CHARGE,
-                        null, // orderId 없음
-                        savedPoint.getBalance()
-                );
-                transactionRepository.save(transaction);
+            // 3. 거래 이력 기록
+            PointTransaction transaction = PointTransaction.create(
+                    savedPoint.getId(),
+                    amount,
+                    TransactionType.CHARGE,
+                    null, // orderId 없음
+                    savedPoint.getBalance()
+            );
+            transactionRepository.save(transaction);
 
-                return savedPoint;
+            return savedPoint;
+        } catch (DataIntegrityViolationException e) {
+            // 동시에 계좌 생성 시도로 unique constraint 위반 발생
+            // 다시 조회하여 락을 획득하고 충전 재시도
+            log.debug("포인트 계좌 동시 생성 감지, 재조회 후 처리. userId={}", userId);
 
-            } catch (PointException e) {
-                // 낙관적 락 실패 시 재시도
-                if (e.getErrorCode() == PointErrorCode.OPTIMISTIC_LOCK_FAILURE) {
-                    retryCount++;
-                    if (retryCount >= POINT_CHARGE_MAX_RETRY_COUNT) {
-                        throw e;
-                    }
-                    try {
-                        Thread.sleep(50L * retryCount);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        throw e;
-                    }
-                } else {
-                    throw e;
-                }
-            }
+            // 이미 다른 트랜잭션이 생성한 계좌를 락과 함께 조회
+            Point point = pointRepository.findByUserIdForUpdate(userId)
+                    .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND));
+
+            Point chargedPoint = point.charge(amount);
+            Point savedPoint = pointRepository.save(chargedPoint);
+
+            PointTransaction transaction = PointTransaction.create(
+                    savedPoint.getId(),
+                    amount,
+                    TransactionType.CHARGE,
+                    null,
+                    savedPoint.getBalance()
+            );
+            transactionRepository.save(transaction);
+
+            return savedPoint;
         }
-
-        throw new PointException(PointErrorCode.OPTIMISTIC_LOCK_FAILURE);
     }
 
     public Point getPoint(Long userId) {
         return pointRepository.findByUserId(userId)
                 .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND, "userId: " + userId));
+    }
+
+    public BigDecimal getBalance(Long userId) {
+        return Optional.ofNullable(getPoint(userId))
+                .map(Point::getBalance)
+                .orElse(BigDecimal.ZERO);
     }
 
     public Point getPointById(Long pointId) {
@@ -94,101 +106,48 @@ public class PointService {
 
     @Transactional
     public Point usePoint(Long userId, BigDecimal amount, Long orderId) {
-        int retryCount = 0;
+        // 1. 포인트 계좌 조회 (비관적 락 적용)
+        Point point = pointRepository.findByUserIdForUpdate(userId)
+                .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND, "userId: " + userId));
 
-        while (retryCount < POINT_CHARGE_MAX_RETRY_COUNT) {
-            try {
-                // 1. 포인트 계좌 조회
-                Point point = pointRepository.findByUserId(userId)
-                        .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND, "userId: " + userId));
+        // 2. 포인트 사용
+        Point usedPoint = point.use(amount);
+        Point savedPoint = pointRepository.save(usedPoint);
 
-                // 2. 포인트 사용
-                Point usedPoint = point.use(amount);
-                Point savedPoint = pointRepository.save(usedPoint);
+        // 3. 거래 이력 기록
+        PointTransaction transaction = PointTransaction.create(
+                savedPoint.getId(),
+                amount,
+                TransactionType.USE,
+                orderId,
+                savedPoint.getBalance()
+        );
+        transactionRepository.save(transaction);
 
-                // 3. 거래 이력 기록
-                PointTransaction transaction = PointTransaction.create(
-                        savedPoint.getId(),
-                        amount,
-                        TransactionType.USE,
-                        orderId,
-                        savedPoint.getBalance()
-                );
-                transactionRepository.save(transaction);
-
-                return savedPoint;
-
-            } catch (PointException e) {
-                // 낙관적 락 실패 시 재시도
-                if (e.getErrorCode() == PointErrorCode.OPTIMISTIC_LOCK_FAILURE) {
-                    retryCount++;
-                    if (retryCount >= POINT_CHARGE_MAX_RETRY_COUNT) {
-                        // 최대 재시도 횟수 초과
-                        throw e;
-                    }
-                    // 짧은 대기 후 재시도 (exponential backoff)
-                    try {
-                        Thread.sleep(50L * retryCount);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        throw e;
-                    }
-                } else {
-                    throw e;
-                }
-            }
-        }
-
-        // 이 코드는 도달하지 않지만, 컴파일러를 위해 추가
-        throw new PointException(PointErrorCode.OPTIMISTIC_LOCK_FAILURE);
+        return savedPoint;
     }
 
     @Transactional
     public Point refundPoint(Long userId, BigDecimal amount, Long orderId) {
-        int retryCount = 0;
+        // 1. 포인트 계좌 조회 (비관적 락 적용)
+        Point point = pointRepository.findByUserIdForUpdate(userId)
+                .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND, "userId: " + userId));
 
-        while (retryCount < POINT_CHARGE_MAX_RETRY_COUNT) {
-            try {
-                // 1. 포인트 계좌 조회
-                Point point = pointRepository.findByUserId(userId)
-                        .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND, "userId: " + userId));
+        // 2. 포인트 환불
+        Point refundedPoint = point.refund(amount);
+        Point savedPoint = pointRepository.save(refundedPoint);
 
-                // 2. 포인트 환불
-                Point refundedPoint = point.refund(amount);
-                Point savedPoint = pointRepository.save(refundedPoint);
+        // 3. 거래 이력 기록
+        PointTransaction transaction = PointTransaction.create(
+                savedPoint.getId(),
+                amount,
+                TransactionType.REFUND,
+                orderId,
+                savedPoint.getBalance()
+        );
+        transactionRepository.save(transaction);
 
-                // 3. 거래 이력 기록
-                PointTransaction transaction = PointTransaction.create(
-                        savedPoint.getId(),
-                        amount,
-                        TransactionType.REFUND,
-                        orderId,
-                        savedPoint.getBalance()
-                );
-                transactionRepository.save(transaction);
-
-                return savedPoint;
-
-            } catch (PointException e) {
-                // 낙관적 락 실패 시 재시도
-                if (e.getErrorCode() == PointErrorCode.OPTIMISTIC_LOCK_FAILURE) {
-                    retryCount++;
-                    if (retryCount >= POINT_CHARGE_MAX_RETRY_COUNT) {
-                        throw e;
-                    }
-                    try {
-                        Thread.sleep(50L * retryCount);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        throw e;
-                    }
-                } else {
-                    throw e;
-                }
-            }
-        }
-
-        throw new PointException(PointErrorCode.OPTIMISTIC_LOCK_FAILURE);
+        return savedPoint;
     }
 
     public boolean hasPointAccount(Long userId) {

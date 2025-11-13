@@ -1,16 +1,15 @@
-package com.hh.ecom.order.infrastructure;
+package com.hh.ecom.order.infrastructure.persistence.inmemory;
 
 import com.hh.ecom.order.domain.OrderItem;
 import com.hh.ecom.order.domain.OrderItemRepository;
+import com.hh.ecom.order.domain.ProductSalesCount;
 import com.hh.ecom.order.infrastructure.persistence.entity.OrderItemEntity;
-import org.springframework.stereotype.Repository;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
-@Repository
 public class OrderItemInMemoryRepository implements OrderItemRepository {
 
     private final Map<Long, OrderItemEntity> storage = new ConcurrentHashMap<>();
@@ -57,6 +56,28 @@ public class OrderItemInMemoryRepository implements OrderItemRepository {
         return storage.values().stream()
                 .map(OrderItemEntity::toDomain)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ProductSalesCount> findTopProductsBySalesCount(int limit) {
+        // InMemory 구현: 메모리에서 집계
+        Map<Long, Long> salesMap = storage.values().stream()
+                .map(OrderItemEntity::toDomain)
+                .collect(Collectors.groupingBy(
+                        OrderItem::getProductId,
+                        Collectors.summingLong(item -> item.getQuantity().longValue())
+                ));
+
+        return salesMap.entrySet().stream()
+                .sorted(Map.Entry.<Long, Long>comparingByValue().reversed())
+                .limit(limit)
+                .map(entry -> ProductSalesCount.of(entry.getKey(), entry.getValue()))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public void deleteAll() {
+        clear();
     }
 
     public void clear() {

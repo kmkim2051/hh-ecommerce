@@ -1,15 +1,18 @@
 package com.hh.ecom.point.presentation;
 
+import com.hh.ecom.config.TestContainersConfig;
 import com.hh.ecom.point.application.PointService;
 import com.hh.ecom.point.domain.Point;
+import com.hh.ecom.point.domain.PointRepository;
 import com.hh.ecom.point.domain.PointTransaction;
+import com.hh.ecom.point.domain.PointTransactionRepository;
 import com.hh.ecom.point.domain.exception.PointException;
-import com.hh.ecom.point.infrastructure.persistence.PointInMemoryRepository;
-import com.hh.ecom.point.infrastructure.persistence.PointTransactionInMemoryRepository;
 import com.hh.ecom.product.presentation.dto.request.ChargePointRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
@@ -17,25 +20,28 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
 
+@SpringBootTest
 @DisplayName("PointController 통합 테스트 (Controller + Service + Repository)")
-class PointControllerIntegrationTest {
+class PointControllerIntegrationTest extends TestContainersConfig {
+
+    @Autowired
+    private PointService pointService;
+
+    @Autowired
+    private PointRepository pointRepository;
+
+    @Autowired
+    private PointTransactionRepository pointTransactionRepository;
 
     private PointController pointController;
-    private PointService pointService;
-    private PointInMemoryRepository pointRepository;
-    private PointTransactionInMemoryRepository pointTransactionRepository;
-
     private Long testUserId;
 
     @BeforeEach
     void setUp() {
-        pointRepository = new PointInMemoryRepository();
-        pointTransactionRepository = new PointTransactionInMemoryRepository();
-        pointService = new PointService(pointRepository, pointTransactionRepository);
         pointController = new PointController(pointService);
 
-        pointRepository.deleteAll();
         pointTransactionRepository.deleteAll();
+        pointRepository.deleteAll();
 
         testUserId = 1L;
     }
@@ -127,8 +133,8 @@ class PointControllerIntegrationTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody()).hasSize(2);
 
-        PointTransaction chargeTransaction = response.getBody().get(1);
-        PointTransaction useTransaction = response.getBody().get(0);
+        PointTransaction chargeTransaction = response.getBody().get(0);
+        PointTransaction useTransaction = response.getBody().get(1);
 
         assertThat(chargeTransaction.getType().name()).isEqualTo("CHARGE");
         assertThat(chargeTransaction.getAmount()).isEqualByComparingTo(BigDecimal.valueOf(20000));

@@ -17,6 +17,8 @@ public enum OrderErrorCode {
     INVALID_DISCOUNT_AMOUNT("ORDER_008", "할인 금액이 주문 금액을 초과할 수 없습니다.", HttpStatus.BAD_REQUEST),
     PRODUCT_IN_ORDER_NOT_FOUND("ORDER_009", "주문 아이템의 상품을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     COUPON_IN_ORDER_NOT_FOUND("ORDER_010", "주문에 사용할 쿠폰을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+    EMPTY_ORDER_CART_ITEM("ORDER_011", "주문에 사용할 장바구니가 비어있습니다.", HttpStatus.BAD_REQUEST),
+    ORDER_CART_ITEM_NOT_FOUND("ORDER_012", "주문에 사용할 장바구니 항목을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
     ;
 
     private final String code;

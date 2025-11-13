@@ -20,7 +20,7 @@ public class CouponUser {
     private final LocalDateTime issuedAt;
     private final LocalDateTime usedAt;
     private final LocalDateTime expireDate;
-    private final Boolean isUsed;
+    private final boolean isUsed;
 
     public static CouponUser issue(Long userId, Long couponId, LocalDateTime expireDate) {
         if (userId == null) {

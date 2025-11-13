@@ -180,7 +180,7 @@ class ProductServiceTest {
         @DisplayName("조회수가 높은 상품 목록을 조회한다")
         void getProductsByViewCount_success() {
             // given
-            Integer limit = 5;
+            int limit = 5;
             Product product1 = Product.create("상품1", "설명1", BigDecimal.valueOf(1000), 10);
             Product product2 = Product.create("상품2", "설명2", BigDecimal.valueOf(2000), 20);
             Product product3 = Product.create("상품3", "설명3", BigDecimal.valueOf(3000), 30);
@@ -247,13 +247,14 @@ class ProductServiceTest {
         @DisplayName("판매량이 높은 상품 목록을 조회한다")
         void getProductsBySalesCount_success() {
             // given
-            Integer limit = 5;
+            int limit = 5;
+            // 판매량 데이터: 상품1=50개, 상품2=30개, 상품3=20개
             List<Product> topProducts = List.of(
-                    Product.create("인기상품1", "설명1", BigDecimal.valueOf(10000), 50),
-                    Product.create("인기상품2", "설명2", BigDecimal.valueOf(20000), 30),
-                    Product.create("인기상품3", "설명3", BigDecimal.valueOf(30000), 20)
+                    Product.create("인기상품1", "설명1", BigDecimal.valueOf(10000), 50).toBuilder().id(1L).build(),
+                    Product.create("인기상품2", "설명2", BigDecimal.valueOf(20000), 30).toBuilder().id(2L).build(),
+                    Product.create("인기상품3", "설명3", BigDecimal.valueOf(30000), 20).toBuilder().id(3L).build()
             );
-            given(productRepository.findTopBySalesCount(anyInt())).willReturn(topProducts);
+            given(productRepository.findTopBySalesCount(limit)).willReturn(topProducts);
 
             // when
             List<Product> result = productService.getProductsBySalesCount(limit);
@@ -269,8 +270,8 @@ class ProductServiceTest {
         @DisplayName("판매량 기반 조회 시 빈 리스트를 반환할 수 있다")
         void getProductsBySalesCount_emptyList() {
             // given
-            Integer limit = 5;
-            given(productRepository.findTopBySalesCount(anyInt())).willReturn(List.of());
+            int limit = 5;
+            given(productRepository.findTopBySalesCount(limit)).willReturn(List.of());
 
             // when
             List<Product> result = productService.getProductsBySalesCount(limit);
@@ -284,12 +285,14 @@ class ProductServiceTest {
         @DisplayName("limit 만큼만 상품을 조회한다")
         void getProductsBySalesCount_withLimit() {
             // given
-            Integer limit = 2;
+            int limit = 2;
+
             List<Product> products = List.of(
-                    Product.create("상품1", "설명1", BigDecimal.valueOf(1000), 10),
-                    Product.create("상품2", "설명2", BigDecimal.valueOf(2000), 20)
+                    Product.create("상품1", "설명1", BigDecimal.valueOf(1000), 10).toBuilder().id(1L).build(),
+                    Product.create("상품2", "설명2", BigDecimal.valueOf(2000), 20).toBuilder().id(2L).build()
             );
-            given(productRepository.findTopBySalesCount(anyInt())).willReturn(products);
+
+            given(productRepository.findTopBySalesCount(limit)).willReturn(products);
 
             // when
             List<Product> result = productService.getProductsBySalesCount(limit);

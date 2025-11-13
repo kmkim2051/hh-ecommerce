@@ -1,45 +1,50 @@
 package com.hh.ecom.coupon.presentation;
 
+import com.hh.ecom.config.TestContainersConfig;
 import com.hh.ecom.coupon.application.CouponService;
 import com.hh.ecom.coupon.domain.Coupon;
+import com.hh.ecom.coupon.domain.CouponRepository;
 import com.hh.ecom.coupon.domain.CouponUser;
+import com.hh.ecom.coupon.domain.CouponUserRepository;
 import com.hh.ecom.coupon.domain.exception.CouponException;
-import com.hh.ecom.coupon.infrastructure.persistence.CouponInMemoryRepository;
-import com.hh.ecom.coupon.infrastructure.persistence.CouponUserInMemoryRepository;
 import com.hh.ecom.coupon.presentation.dto.response.CouponIssueResponse;
 import com.hh.ecom.coupon.presentation.dto.response.CouponListResponse;
 import com.hh.ecom.coupon.presentation.dto.response.MyCouponListResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
 
+@SpringBootTest
 @DisplayName("CouponController 통합 테스트 (Controller + Service + Repository)")
-class CouponControllerIntegrationTest {
+class CouponControllerIntegrationTest extends TestContainersConfig {
+
+    @Autowired
+    private CouponService couponService;
+
+    @Autowired
+    private CouponRepository couponRepository;
+
+    @Autowired
+    private CouponUserRepository couponUserRepository;
 
     private CouponController couponController;
-    private CouponService couponService;
-    private CouponInMemoryRepository couponRepository;
-    private CouponUserInMemoryRepository couponUserRepository;
-
     private Coupon testCoupon;
     private Long testUserId;
 
     @BeforeEach
     void setUp() {
-        couponRepository = new CouponInMemoryRepository();
-        couponUserRepository = new CouponUserInMemoryRepository();
-        couponService = new CouponService(couponRepository, couponUserRepository);
         couponController = new CouponController(couponService);
 
-        couponRepository.deleteAll();
         couponUserRepository.deleteAll();
+        couponRepository.deleteAll();
 
         testUserId = 1L;
         testCoupon = Coupon.create(

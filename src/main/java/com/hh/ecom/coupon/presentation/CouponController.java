@@ -3,6 +3,7 @@ package com.hh.ecom.coupon.presentation;
 import com.hh.ecom.coupon.application.CouponService;
 import com.hh.ecom.coupon.domain.Coupon;
 import com.hh.ecom.coupon.domain.CouponUser;
+import com.hh.ecom.coupon.domain.CouponUserWithCoupon;
 import com.hh.ecom.coupon.presentation.api.CouponApi;
 import com.hh.ecom.coupon.presentation.dto.response.CouponIssueResponse;
 import com.hh.ecom.coupon.presentation.dto.response.CouponListResponse;
@@ -51,7 +52,7 @@ public class CouponController implements CouponApi {
     public ResponseEntity<MyCouponListResponse> getMyCoupons(
             @RequestHeader("userId") Long userId
     ) {
-        List<CouponService.CouponUserWithCoupon> myCoupons = couponService.getMyCoupons(userId);
+        List<CouponUserWithCoupon> myCoupons = couponService.getMyCoupons(userId);
         MyCouponListResponse response = MyCouponListResponse.from(myCoupons);
 
         return ResponseEntity.ok(response);
