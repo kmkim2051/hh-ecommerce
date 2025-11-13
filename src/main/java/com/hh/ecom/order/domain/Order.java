@@ -87,6 +87,9 @@ public class Order {
                 .id(id)
                 .build();
     }
+    public Order processPayment() {
+        return updateStatus(OrderStatus.PAID);
+    }
 
     public Order updateStatus(OrderStatus newStatus) {
         return this.toBuilder()

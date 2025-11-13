@@ -2,31 +2,57 @@ package com.hh.ecom.order.infrastructure.persistence.entity;
 
 import com.hh.ecom.order.domain.OrderItem;
 import com.hh.ecom.order.domain.OrderItemStatus;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * In-Memory DB를 위한 POJO entity
- * JPA 도입 시 변경 예정
+ * JPA entity for OrderItem
  */
+@Entity
+@Table(name = "order_items")
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class OrderItemEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false)
     private Long orderId;
+
+    @Column(nullable = false)
     private Long productId;
+
+    @Column(nullable = false, length = 255)
     private String productName;
+
+    @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
+
+    @Column(nullable = false)
     private Integer quantity;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
     private OrderItemStatus status;
+
+    // Audit
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(nullable = false)
     private LocalDateTime updatedAt;
 
     public OrderItem toDomain() {

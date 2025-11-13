@@ -6,7 +6,9 @@ import com.hh.ecom.cart.domain.CartItemList;
 import com.hh.ecom.coupon.application.CouponService;
 import com.hh.ecom.coupon.domain.Coupon;
 import com.hh.ecom.coupon.domain.CouponUser;
+import com.hh.ecom.coupon.domain.CouponUserWithCoupon;
 import com.hh.ecom.order.application.dto.CreateOrderCommand;
+import com.hh.ecom.order.application.dto.DiscountInfo;
 import com.hh.ecom.order.domain.*;
 import com.hh.ecom.order.domain.exception.OrderErrorCode;
 import com.hh.ecom.order.domain.exception.OrderException;
@@ -15,6 +17,7 @@ import com.hh.ecom.point.domain.Point;
 import com.hh.ecom.product.application.ProductService;
 import com.hh.ecom.product.domain.Product;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +26,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderService {
@@ -35,35 +39,32 @@ public class OrderService {
 
     @Transactional
     public Order createOrder(Long userId, CreateOrderCommand createOrderCommand) {
+        createOrderCommand.validate();
+        validateOrderPaymentAbility(userId);
+
+        // cart item 기반으로 order 주문
         List<Long> cartItemIds = createOrderCommand.cartItemIds();
-        Long couponId = createOrderCommand.couponId();
+        final Long couponId = createOrderCommand.couponId();
+        log.info("order 생성 시작합니다. (userId: {}, create command: {})", userId, createOrderCommand );
 
-        if (cartItemIds == null || cartItemIds.isEmpty()) {
-            throw new OrderException(OrderErrorCode.EMPTY_ORDER_ITEMS);
-        }
-
-        List<CartItem> cartItems = cartItemIds.stream()
-                .map(cartService::getCartItem)
+        List<CartItem> findCartItems = cartItemIds.stream()
+                .map(cartService::getCartItemById)
                 .toList();
 
-        CartItemList cartItemList = CartItemList.from(cartItems);
-        cartItemList.validateCartItemOwnership(userId);
+        validateCartItemsInOrderExists(findCartItems);
 
-        List<Product> products = productService.getProductList(cartItemList.getProductIdList());
-        cartItemList.validateStockAvailability(products);
+        CartItemList cart = CartItemList.from(findCartItems);
+        cart.validateCartItemOwnership(userId);
+
+        List<Product> products = productService.getProductList(cart.getProductIdList());
+        cart.validateEnoughStock(products);
 
         DiscountInfo discountInfo = calculateDiscountInfo(userId, couponId);
         BigDecimal discountAmount = discountInfo.discountAmount();
         Long couponUserId = discountInfo.couponUserId();
 
-        BigDecimal totalAmount = cartItemList.calculateTotalPrice(products);
-        BigDecimal finalAmount = totalAmount.subtract(discountAmount).max(BigDecimal.ZERO);
-
-        if (finalAmount.compareTo(BigDecimal.ZERO) < 0) {
-            throw new OrderException(OrderErrorCode.INVALID_DISCOUNT_AMOUNT);
-        }
-
-        validatePointAccountExists(userId);
+        final BigDecimal totalAmount = cart.calculateTotalPrice(products);
+        final BigDecimal finalAmount = calculateValidFinalAmount(totalAmount, discountAmount);
 
         BigDecimal userBalance = Optional.ofNullable(pointService.getPoint(userId))
                 .map(Point::getBalance)
@@ -78,18 +79,28 @@ public class OrderService {
         Map<Long, Product> productMap = products.stream()
                 .collect(Collectors.toMap(Product::getId, Function.identity()));
 
-        List<OrderItem> savedOrderItems = saveAndGetOrderItemList(cartItems, productMap, savedOrder);
+        List<OrderItem> savedOrderItems = saveAndGetOrderItemList(findCartItems, productMap, savedOrder);
 
-        decreaseProductStockInCart(cartItems, productMap);
+        decreaseProductStockInCart(findCartItems, productMap);
+
         usePoint(userId, finalAmount, savedOrder);
         useCoupon(couponUserId, savedOrder);
 
-        Order paidOrder = savedOrder.updateStatus(OrderStatus.PAID);
+        Order paidOrder = savedOrder.processPayment();
         Order updatedOrder = orderRepository.save(paidOrder);
 
-        removeCartItemsOfUser(userId, cartItemIds, cartItems);
+        removeCartItemsOfUser(userId, cartItemIds, findCartItems);
 
         return updatedOrder.setOrderItems(savedOrderItems);
+    }
+
+    private static BigDecimal calculateValidFinalAmount(BigDecimal totalAmount, BigDecimal discountAmount) {
+        BigDecimal result = totalAmount.subtract(discountAmount).max(BigDecimal.ZERO);
+        if (result.compareTo(BigDecimal.ZERO) < 0) {
+            throw new OrderException(OrderErrorCode.INVALID_DISCOUNT_AMOUNT);
+        }
+
+        return result;
     }
 
     @Transactional
@@ -139,19 +150,20 @@ public class OrderService {
         }
 
         CouponUser validCouponUser = findValidCouponUser(userId, couponId);
-        return new DiscountInfo(coupon.getDiscountAmount(), validCouponUser.getId());
+        return DiscountInfo.of(coupon.getDiscountAmount(), validCouponUser.getId());
     }
 
     private CouponUser findValidCouponUser(Long userId, Long couponId) {
-        List<CouponService.CouponUserWithCoupon> userCoupons =
+        List<CouponUserWithCoupon> userCoupons =
                 Optional.ofNullable(couponService.getAllMyCoupons(userId))
                         .orElse(Collections.emptyList());
 
         return userCoupons.stream()
                 .filter(cwc -> cwc.isSameCouponId(couponId))
-                .map(CouponService.CouponUserWithCoupon::getCouponUser)
+                .map(CouponUserWithCoupon::getCouponUser)
                 .filter(Objects::nonNull)
-                .filter(cu -> Boolean.FALSE.equals(cu.getIsUsed()))
+
+                .filter(CouponUser::isUsable)
                 .findFirst()
                 .orElseThrow(() -> new OrderException(OrderErrorCode.INVALID_ORDER_STATUS, "사용 가능한 쿠폰이 없습니다. id=" + couponId));
     }
@@ -193,7 +205,7 @@ public class OrderService {
         }
     }
 
-    private void validatePointAccountExists(Long userId) {
+    private void validateOrderPaymentAbility(Long userId) {
         if (!pointService.hasPointAccount(userId)) {
             throw new OrderException(OrderErrorCode.INVALID_ORDER_STATUS, "포인트 계정이 없습니다. 포인트를 충전해주세요.");
         }
@@ -209,9 +221,10 @@ public class OrderService {
                 .filter(Objects::nonNull)
                 .toList());
     }
-
-    private record DiscountInfo(BigDecimal discountAmount, Long couponUserId) {
-        public static final DiscountInfo NONE = new DiscountInfo(BigDecimal.ZERO, null);
+    private static void validateCartItemsInOrderExists(List<CartItem> findCartItems) {
+        if (findCartItems.isEmpty()) {
+            throw new OrderException(OrderErrorCode.EMPTY_ORDER_CART_ITEM);
+        }
     }
 }
 
