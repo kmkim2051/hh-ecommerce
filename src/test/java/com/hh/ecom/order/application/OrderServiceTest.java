@@ -81,7 +81,7 @@ class OrderServiceTest {
                 orderService.createOrder(userId, command))
                 .isInstanceOf(OrderException.class)
                 .extracting(ex -> ((OrderException) ex).getErrorCode())
-                .isEqualTo(OrderErrorCode.EMPTY_ORDER_ITEMS);
+                .isEqualTo(OrderErrorCode.EMPTY_ORDER_CART_ITEM);
 
         verify(orderRepository, never()).save(any(Order.class));
     }
