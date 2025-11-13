@@ -1,37 +1,66 @@
 package com.hh.ecom.product.infrastructure.persistence.entity;
 
 import com.hh.ecom.product.domain.Product;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * In-Memory DB를 위한 POJO entity
- * JPA 도입 시 변경 예정
+ * JPA entity for Product
  * */
+@Entity
+@Table(name = "products")
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class ProductEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false, length = 255)
     private String name;
+
+    @Column(columnDefinition = "TEXT")
     private String description;
+
+    @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
+
+    @Column(nullable = false)
     private Integer stockQuantity;
-    private Integer viewCount;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer viewCount = 0;
 
     // Soft Delete
-    private Boolean isActive;
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean isActive = true;
+
     private LocalDateTime deletedAt;
 
     // Audit
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(nullable = false)
     private LocalDateTime updatedAt;
+
+    // Optimistic Lock
+    @Version
+    private Long version;
 
     public Product toDomain() {
         return Product.builder()
