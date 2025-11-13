@@ -1,18 +1,16 @@
-package com.hh.ecom.point.infrastructure.persistence;
+package com.hh.ecom.point.infrastructure.persistence.inmemory;
 
 import com.hh.ecom.point.domain.Point;
 import com.hh.ecom.point.domain.PointRepository;
 import com.hh.ecom.point.domain.exception.PointErrorCode;
 import com.hh.ecom.point.domain.exception.PointException;
 import com.hh.ecom.point.infrastructure.persistence.entity.PointEntity;
-import org.springframework.stereotype.Repository;
 
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-@Repository
 public class PointInMemoryRepository implements PointRepository {
     private final Map<Long, PointEntity> points = new ConcurrentHashMap<>();
     private final Map<Long, Long> userIdToPointId = new ConcurrentHashMap<>(); // userId -> pointId 매핑
@@ -30,25 +28,28 @@ public class PointInMemoryRepository implements PointRepository {
                     .id(newId)
                     .userId(entity.getUserId())
                     .balance(entity.getBalance())
-                    .version(entity.getVersion())
                     .updatedAt(entity.getUpdatedAt())
+                    // version은 Entity에서 자동 관리
                     .build();
 
             // userId -> pointId 매핑 저장
             userIdToPointId.put(point.getUserId(), newId);
         } else {
-            // 기존 포인트 계좌 업데이트 (낙관적 락 적용)
+            // 기존 포인트 계좌 업데이트
             PointEntity existingEntity = points.get(point.getId());
             if (existingEntity == null) {
                 throw new PointException(PointErrorCode.POINT_NOT_FOUND);
             }
 
-            // 버전 체크 (낙관적 락)
-            if (!existingEntity.getVersion().equals(point.getVersion() - 1)) {
-                throw new PointException(PointErrorCode.OPTIMISTIC_LOCK_FAILURE);
-            }
-
             entity = PointEntity.from(point);
+            // ID는 유지
+            entity = PointEntity.builder()
+                    .id(point.getId())
+                    .userId(entity.getUserId())
+                    .balance(entity.getBalance())
+                    .updatedAt(entity.getUpdatedAt())
+                    // version은 InMemory에서는 무시 (JPA에서만 의미 있음)
+                    .build();
         }
 
         points.put(entity.getId(), entity);
@@ -68,6 +69,12 @@ public class PointInMemoryRepository implements PointRepository {
             return Optional.empty();
         }
         return findById(pointId);
+    }
+
+    @Override
+    public Optional<Point> findByUserIdForUpdate(Long userId) {
+        // In-memory에서는 락이 필요없으므로 findByUserId와 동일
+        return findByUserId(userId);
     }
 
     @Override
