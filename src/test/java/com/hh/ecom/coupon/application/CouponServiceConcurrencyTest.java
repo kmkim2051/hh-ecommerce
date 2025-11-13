@@ -1,13 +1,13 @@
 package com.hh.ecom.coupon.application;
 
-import com.hh.ecom.coupon.domain.Coupon;
-import com.hh.ecom.coupon.domain.CouponUser;
+import com.hh.ecom.config.TestContainersConfig;
+import com.hh.ecom.coupon.domain.*;
 import com.hh.ecom.coupon.domain.exception.CouponException;
-import com.hh.ecom.coupon.infrastructure.persistence.CouponInMemoryRepository;
-import com.hh.ecom.coupon.infrastructure.persistence.CouponUserInMemoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -19,21 +19,28 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.*;
 
+@SpringBootTest
 @DisplayName("CouponService 동시성 테스트")
-class CouponServiceConcurrencyTest {
+class CouponServiceConcurrencyTest extends TestContainersConfig {
 
+    @Autowired
     private CouponService couponService;
-    private CouponInMemoryRepository couponRepository;
-    private CouponUserInMemoryRepository couponUserRepository;
+
+    @Autowired
+    private CouponRepository couponRepository;
+
+    @Autowired
+    private CouponUserRepository couponUserRepository;
 
     @BeforeEach
     void setUp() {
-        couponRepository = new CouponInMemoryRepository();
-        couponUserRepository = new CouponUserInMemoryRepository();
-        couponService = new CouponService(couponRepository, couponUserRepository);
-
-        couponRepository.deleteAll();
+        System.out.println("=== 테스트 시작 전 데이터 정리 ===");
+        System.out.println("삭제 전 coupon 개수: " + couponRepository.findAll().size());
+        System.out.println("삭제 전 couponUser 개수: " + couponUserRepository.findByUserId(1L).size());
         couponUserRepository.deleteAll();
+        couponRepository.deleteAll();
+        System.out.println("삭제 후 coupon 개수: " + couponRepository.findAll().size());
+        System.out.println("삭제 후 couponUser 개수: " + couponUserRepository.findByUserId(1L).size());
     }
 
     @Test
@@ -140,7 +147,7 @@ class CouponServiceConcurrencyTest {
         assertThat(failCount.get()).isEqualTo(concurrentAttempts - 1);
 
         // 해당 사용자의 쿠폰 발급 내역 확인
-        List<CouponService.CouponUserWithCoupon> userCoupons = couponService.getMyCoupons(userId);
+        List<CouponUserWithCoupon> userCoupons = couponService.getMyCoupons(userId);
         assertThat(userCoupons).hasSize(1);
     }
     @Test

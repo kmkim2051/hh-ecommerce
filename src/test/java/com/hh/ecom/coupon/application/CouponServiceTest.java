@@ -1,10 +1,6 @@
 package com.hh.ecom.coupon.application;
 
-import com.hh.ecom.coupon.domain.Coupon;
-import com.hh.ecom.coupon.domain.CouponRepository;
-import com.hh.ecom.coupon.domain.CouponStatus;
-import com.hh.ecom.coupon.domain.CouponUser;
-import com.hh.ecom.coupon.domain.CouponUserRepository;
+import com.hh.ecom.coupon.domain.*;
 import com.hh.ecom.coupon.domain.exception.CouponErrorCode;
 import com.hh.ecom.coupon.domain.exception.CouponException;
 import org.junit.jupiter.api.BeforeEach;
@@ -135,7 +131,7 @@ class CouponServiceTest {
             Long couponId = 1L;
             Coupon decreasedCoupon = testCoupon.decreaseQuantity();
 
-            given(couponRepository.findById(anyLong())).willReturn(Optional.of(testCoupon));
+            given(couponRepository.findByIdForUpdate(anyLong())).willReturn(Optional.of(testCoupon));
             given(couponUserRepository.findByUserIdAndCouponId(anyLong(), anyLong()))
                     .willReturn(Optional.empty());
             given(couponRepository.save(any(Coupon.class))).willReturn(decreasedCoupon);
@@ -148,9 +144,9 @@ class CouponServiceTest {
             assertThat(result).isNotNull();
             assertThat(result.getUserId()).isEqualTo(userId);
             assertThat(result.getCouponId()).isEqualTo(couponId);
-            assertThat(result.getIsUsed()).isFalse();
+            assertThat(result.isUsed()).isFalse();
 
-            verify(couponRepository).findById(couponId);
+            verify(couponRepository).findByIdForUpdate(couponId);
             verify(couponUserRepository).findByUserIdAndCouponId(userId, couponId);
             verify(couponRepository).save(any(Coupon.class));
             verify(couponUserRepository).save(any(CouponUser.class));
@@ -162,7 +158,7 @@ class CouponServiceTest {
             // given
             Long userId = 1L;
             Long couponId = 999L;
-            given(couponRepository.findById(anyLong())).willReturn(Optional.empty());
+            given(couponRepository.findByIdForUpdate(anyLong())).willReturn(Optional.empty());
 
             // when & then
             assertThatThrownBy(() -> couponService.issueCoupon(userId, couponId))
@@ -171,7 +167,7 @@ class CouponServiceTest {
                     .extracting("errorCode")
                     .isEqualTo(CouponErrorCode.COUPON_NOT_FOUND);
 
-            verify(couponRepository).findById(couponId);
+            verify(couponRepository).findByIdForUpdate(couponId);
         }
 
         @Test
@@ -181,7 +177,7 @@ class CouponServiceTest {
             Long userId = 1L;
             Long couponId = 1L;
 
-            given(couponRepository.findById(anyLong())).willReturn(Optional.of(testCoupon));
+            given(couponRepository.findByIdForUpdate(anyLong())).willReturn(Optional.of(testCoupon));
             given(couponUserRepository.findByUserIdAndCouponId(anyLong(), anyLong()))
                     .willReturn(Optional.of(testCouponUser));
 
@@ -191,7 +187,7 @@ class CouponServiceTest {
                     .extracting("errorCode")
                     .isEqualTo(CouponErrorCode.COUPON_ALREADY_ISSUED);
 
-            verify(couponRepository).findById(couponId);
+            verify(couponRepository).findByIdForUpdate(couponId);
             verify(couponUserRepository).findByUserIdAndCouponId(userId, couponId);
         }
 
@@ -209,7 +205,7 @@ class CouponServiceTest {
                     LocalDateTime.now().plusDays(30)
             ).decreaseQuantity();
 
-            given(couponRepository.findById(anyLong())).willReturn(Optional.of(soldOutCoupon));
+            given(couponRepository.findByIdForUpdate(anyLong())).willReturn(Optional.of(soldOutCoupon));
 
             // when & then
             assertThatThrownBy(() -> couponService.issueCoupon(userId, couponId))
@@ -217,7 +213,7 @@ class CouponServiceTest {
                     .extracting("errorCode")
                     .isEqualTo(CouponErrorCode.COUPON_SOLD_OUT);
 
-            verify(couponRepository).findById(couponId);
+            verify(couponRepository).findByIdForUpdate(couponId);
         }
 
         @Test
@@ -228,7 +224,7 @@ class CouponServiceTest {
             Long couponId = 1L;
             Coupon disabledCoupon = testCoupon.disable();
 
-            given(couponRepository.findById(anyLong())).willReturn(Optional.of(disabledCoupon));
+            given(couponRepository.findByIdForUpdate(anyLong())).willReturn(Optional.of(disabledCoupon));
 
             // when & then
             assertThatThrownBy(() -> couponService.issueCoupon(userId, couponId))
@@ -236,7 +232,7 @@ class CouponServiceTest {
                     .extracting("errorCode")
                     .isEqualTo(CouponErrorCode.COUPON_NOT_ACTIVE);
 
-            verify(couponRepository).findById(couponId);
+            verify(couponRepository).findByIdForUpdate(couponId);
         }
 
         @Test
@@ -253,7 +249,7 @@ class CouponServiceTest {
                     LocalDateTime.now().minusDays(1)
             );
 
-            given(couponRepository.findById(anyLong())).willReturn(Optional.of(expiredCoupon));
+            given(couponRepository.findByIdForUpdate(anyLong())).willReturn(Optional.of(expiredCoupon));
 
             // when & then
             assertThatThrownBy(() -> couponService.issueCoupon(userId, couponId))
@@ -261,7 +257,7 @@ class CouponServiceTest {
                     .extracting("errorCode")
                     .isEqualTo(CouponErrorCode.COUPON_EXPIRED);
 
-            verify(couponRepository).findById(couponId);
+            verify(couponRepository).findByIdForUpdate(couponId);
         }
     }
 
@@ -290,7 +286,7 @@ class CouponServiceTest {
             given(couponRepository.findById(2L)).willReturn(Optional.of(coupon2));
 
             // when
-            List<CouponService.CouponUserWithCoupon> result = couponService.getMyCoupons(userId);
+            List<CouponUserWithCoupon> result = couponService.getMyCoupons(userId);
 
             // then
             assertThat(result).hasSize(2);
@@ -308,7 +304,7 @@ class CouponServiceTest {
                     .willReturn(List.of());
 
             // when
-            List<CouponService.CouponUserWithCoupon> result = couponService.getMyCoupons(userId);
+            List<CouponUserWithCoupon> result = couponService.getMyCoupons(userId);
 
             // then
             assertThat(result).isEmpty();
@@ -363,7 +359,7 @@ class CouponServiceTest {
             given(couponRepository.findById(2L)).willReturn(Optional.of(coupon2));
 
             // when
-            List<CouponService.CouponUserWithCoupon> result = couponService.getAllMyCoupons(userId);
+            List<CouponUserWithCoupon> result = couponService.getAllMyCoupons(userId);
 
             // then
             assertThat(result).hasSize(2);
@@ -391,7 +387,7 @@ class CouponServiceTest {
 
             // then
             assertThat(result).isNotNull();
-            assertThat(result.getIsUsed()).isTrue();
+            assertThat(result.isUsed()).isTrue();
             assertThat(result.getOrderId()).isEqualTo(orderId);
 
             verify(couponUserRepository).findById(couponUserId);
@@ -509,8 +505,8 @@ class CouponServiceTest {
             Coupon coupon = testCoupon;
 
             // when
-            CouponService.CouponUserWithCoupon result =
-                    CouponService.CouponUserWithCoupon.of(couponUser, coupon);
+            CouponUserWithCoupon result =
+                    CouponUserWithCoupon.of(couponUser, coupon);
 
             // then
             assertThat(result).isNotNull();
@@ -534,11 +530,10 @@ class CouponServiceTest {
                     .isActive(true)
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now())
-                    .version(0L)
                     .build();
 
-            CouponService.CouponUserWithCoupon couponUserWithCoupon =
-                    CouponService.CouponUserWithCoupon.of(testCouponUser, coupon);
+            CouponUserWithCoupon couponUserWithCoupon =
+                    CouponUserWithCoupon.of(testCouponUser, coupon);
 
             // when & then
             assertThat(couponUserWithCoupon.isSameCouponId(1L)).isTrue();
@@ -560,11 +555,10 @@ class CouponServiceTest {
                     .isActive(true)
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now())
-                    .version(0L)
                     .build();
 
-            CouponService.CouponUserWithCoupon couponUserWithCoupon =
-                    CouponService.CouponUserWithCoupon.of(testCouponUser, coupon);
+            CouponUserWithCoupon couponUserWithCoupon =
+                    CouponUserWithCoupon.of(testCouponUser, coupon);
 
             // when & then
             assertThat(couponUserWithCoupon.isSameCouponId(999L)).isFalse();
