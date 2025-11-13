@@ -12,7 +12,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -22,8 +21,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.hamcrest.Matchers.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -59,8 +56,7 @@ class PointControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.userId").value(userId))
-                .andExpect(jsonPath("$.balance").value(50000))
-                .andExpect(jsonPath("$.version").value(3));
+                .andExpect(jsonPath("$.balance").value(50000));
 
         verify(pointService, times(1)).getPoint(userId);
     }
@@ -101,8 +97,7 @@ class PointControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.userId").value(userId))
-                .andExpect(jsonPath("$.balance").value(60000))
-                .andExpect(jsonPath("$.version").value(4));
+                .andExpect(jsonPath("$.balance").value(60000));
 
         verify(pointService, times(1)).chargePoint(userId, BigDecimal.valueOf(10000));
     }
@@ -225,7 +220,6 @@ class PointControllerTest {
                 .id(id)
                 .userId(userId)
                 .balance(balance)
-                .version(version)
                 .updatedAt(LocalDateTime.now())
                 .build();
     }

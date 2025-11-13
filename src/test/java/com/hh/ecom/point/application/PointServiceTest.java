@@ -52,7 +52,6 @@ class PointServiceTest {
                 .id(1L)
                 .userId(userId)
                 .balance(BigDecimal.ZERO)
-                .version(0L)
                 .updatedAt(java.time.LocalDateTime.now())
                 .build();
     }
@@ -66,7 +65,7 @@ class PointServiceTest {
         void chargePoint_createNewAccount() {
             // given
             BigDecimal amount = BigDecimal.valueOf(10000);
-            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.empty());
+            given(pointRepository.findByUserIdForUpdate(anyLong())).willReturn(Optional.empty());
 
             given(pointRepository.save(any(Point.class))).willAnswer(invocation -> {
                 Point point = invocation.getArgument(0);
@@ -96,7 +95,7 @@ class PointServiceTest {
             BigDecimal amount = BigDecimal.valueOf(5000);
             Point existingPoint = testPoint.toBuilder().balance(BigDecimal.valueOf(10000)).build();
 
-            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.of(existingPoint));
+            given(pointRepository.findByUserIdForUpdate(anyLong())).willReturn(Optional.of(existingPoint));
 
             Point chargedPoint = existingPoint.charge(amount);
             given(pointRepository.save(any(Point.class))).willReturn(chargedPoint);
@@ -121,7 +120,7 @@ class PointServiceTest {
         @DisplayName("0 이하의 금액으로 충전 시 예외가 발생한다")
         void chargePoint_invalidAmount() {
             // given
-            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.of(testPoint));
+            given(pointRepository.findByUserIdForUpdate(anyLong())).willReturn(Optional.of(testPoint));
 
             // when & then
             assertThatThrownBy(() -> pointService.chargePoint(userId, BigDecimal.ZERO))
@@ -233,7 +232,7 @@ class PointServiceTest {
             Long orderId = 1L;
             Point chargedPoint = testPoint.toBuilder().balance(BigDecimal.valueOf(10000)).build();
 
-            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.of(chargedPoint));
+            given(pointRepository.findByUserIdForUpdate(anyLong())).willReturn(Optional.of(chargedPoint));
 
             Point usedPoint = chargedPoint.use(amount);
             given(pointRepository.save(any(Point.class))).willReturn(usedPoint);
@@ -261,7 +260,7 @@ class PointServiceTest {
             BigDecimal amount = BigDecimal.valueOf(10000);
             Point lowBalancePoint = testPoint.toBuilder().balance(BigDecimal.valueOf(5000)).build();
 
-            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.of(lowBalancePoint));
+            given(pointRepository.findByUserIdForUpdate(anyLong())).willReturn(Optional.of(lowBalancePoint));
 
             // when & then
             assertThatThrownBy(() -> pointService.usePoint(userId, amount, 1L))
@@ -283,7 +282,7 @@ class PointServiceTest {
             Long orderId = 1L;
             Point point = testPoint.toBuilder().balance(BigDecimal.valueOf(7000)).build();
 
-            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.of(point));
+            given(pointRepository.findByUserIdForUpdate(anyLong())).willReturn(Optional.of(point));
 
             Point refundedPoint = point.refund(amount);
             given(pointRepository.save(any(Point.class))).willReturn(refundedPoint);
@@ -309,7 +308,7 @@ class PointServiceTest {
         void refundPoint_zeroBalance() {
             // given
             BigDecimal amount = BigDecimal.valueOf(5000);
-            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.of(testPoint));
+            given(pointRepository.findByUserIdForUpdate(anyLong())).willReturn(Optional.of(testPoint));
 
             Point refundedPoint = testPoint.refund(amount);
             given(pointRepository.save(any(Point.class))).willReturn(refundedPoint);
