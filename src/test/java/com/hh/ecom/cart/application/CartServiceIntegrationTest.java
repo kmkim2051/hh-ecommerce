@@ -4,66 +4,59 @@ import com.hh.ecom.cart.domain.CartItem;
 import com.hh.ecom.cart.domain.CartItemRepository;
 import com.hh.ecom.cart.domain.exception.CartErrorCode;
 import com.hh.ecom.cart.domain.exception.CartException;
-import com.hh.ecom.cart.infrastructure.persistence.CartItemInMemoryRepository;
-import com.hh.ecom.order.domain.OrderItemRepository;
-import com.hh.ecom.order.infrastructure.OrderItemInMemoryRepository;
+import com.hh.ecom.config.TestContainersConfig;
 import com.hh.ecom.product.domain.Product;
 import com.hh.ecom.product.domain.ProductRepository;
 import com.hh.ecom.product.domain.exception.ProductErrorCode;
 import com.hh.ecom.product.domain.exception.ProductException;
-import com.hh.ecom.product.infrastructure.persistence.ProductInMemoryRepository;
-import com.hh.ecom.product.infrastructure.persistence.entity.ProductEntity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 
-import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@SpringBootTest
 @DisplayName("CartService-Repository 통합 테스트")
-class CartServiceIntegrationTest {
+class CartServiceIntegrationTest extends TestContainersConfig {
 
-    private CartItemRepository cartItemRepository;
-    private ProductRepository productRepository;
-    private OrderItemRepository orderItemRepository;
+    @Autowired
     private CartService cartService;
 
+    @Autowired
+    private CartItemRepository cartItemRepository;
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    private Long product1Id;
+    private Long product2Id;
+    private Long product3Id;
+
     @BeforeEach
-    void setUp() throws Exception {
-        // 실제 In-Memory Repository 인스턴스 생성
-        cartItemRepository = new CartItemInMemoryRepository();
-        orderItemRepository = new OrderItemInMemoryRepository();
-        productRepository = new ProductInMemoryRepository(orderItemRepository);
-        cartService = new CartService(cartItemRepository, productRepository);
+    void setUp() {
+        // 데이터 정리
+        cartItemRepository.deleteAll();
+        productRepository.deleteAll();
 
-        // ProductRepository에 테스트 데이터 추가
-        insertTestProduct(1L, "테스트 상품 1", BigDecimal.valueOf(10000), 100);
-        insertTestProduct(2L, "테스트 상품 2", BigDecimal.valueOf(20000), 50);
-        insertTestProduct(3L, "품절 상품", BigDecimal.valueOf(15000), 0);
-    }
+        // 테스트 상품 생성 (JPA를 통해 정상적으로 저장)
+        Product product1 = Product.create("테스트 상품 1", "설명", BigDecimal.valueOf(10000), 100);
+        product1 = productRepository.save(product1);
+        product1Id = product1.getId();
 
-    private void insertTestProduct(Long id, String name, BigDecimal price, Integer stock) throws Exception {
-        Product product = Product.create(name, "설명", price, stock);
-        ProductEntity entity = ProductEntity.from(product);
+        Product product2 = Product.create("테스트 상품 2", "설명", BigDecimal.valueOf(20000), 50);
+        product2 = productRepository.save(product2);
+        product2Id = product2.getId();
 
-        // Reflection을 사용하여 ID 설정
-        Field idField = ProductEntity.class.getDeclaredField("id");
-        idField.setAccessible(true);
-        idField.set(entity, id);
-
-        // ProductInMemoryRepository의 products Map에 직접 추가
-        Field productsField = ProductInMemoryRepository.class.getDeclaredField("products");
-        productsField.setAccessible(true);
-        @SuppressWarnings("unchecked")
-        Map<Long, ProductEntity> products = (Map<Long, ProductEntity>) productsField.get(productRepository);
-        products.put(id, entity);
+        Product product3 = Product.create("품절 상품", "설명", BigDecimal.valueOf(15000), 0);
+        product3 = productRepository.save(product3);
+        product3Id = product3.getId();
     }
 
     @Nested
@@ -75,7 +68,7 @@ class CartServiceIntegrationTest {
         void addToCart_newProduct_savedInRepository() {
             // given
             Long userId = 1L;
-            Long productId = 1L;
+            Long productId = product1Id;
             Integer quantity = 5;
 
             // when
@@ -97,7 +90,7 @@ class CartServiceIntegrationTest {
         void addToCart_sameProduct_quantityIncreased() {
             // given
             Long userId = 1L;
-            Long productId = 1L;
+            Long productId = product1Id;
             Integer firstQuantity = 5;
             Integer secondQuantity = 3;
 
@@ -122,13 +115,13 @@ class CartServiceIntegrationTest {
             Long userId = 1L;
 
             // when
-            cartService.addToCart(userId, 1L, 5);
-            cartService.addToCart(userId, 2L, 3);
+            cartService.addToCart(userId, product1Id, 5);
+            cartService.addToCart(userId, product2Id, 3);
 
             // then
             List<CartItem> cartItems = cartItemRepository.findAllByUserId(userId);
             assertThat(cartItems).hasSize(2);
-            assertThat(cartItems).extracting(CartItem::getProductId).containsExactlyInAnyOrder(1L, 2L);
+            assertThat(cartItems).extracting(CartItem::getProductId).containsExactlyInAnyOrder(product1Id, product2Id);
         }
 
         @Test
@@ -136,7 +129,7 @@ class CartServiceIntegrationTest {
         void addToCart_outOfStock_throwsException() {
             // given
             Long userId = 1L;
-            Long productId = 3L; // 품절 상품 (재고 0)
+            Long productId = product3Id; // 품절 상품 (재고 0)
 
             // when & then
             // 재고가 0인 상품은 isAvailableForSale() 체크에서 실패하여 ProductException 발생
@@ -152,7 +145,7 @@ class CartServiceIntegrationTest {
         void addToCart_exceedsStock_throwsException() {
             // given
             Long userId = 1L;
-            Long productId = 2L; // 재고 50개
+            Long productId = product2Id; // 재고 50개
             Integer quantity = 100;
 
             // when & then
@@ -173,7 +166,7 @@ class CartServiceIntegrationTest {
         void updateCartItemQuantity_updatedInRepository() {
             // given
             Long userId = 1L;
-            Long productId = 1L;
+            Long productId = product1Id;
             CartItem cartItem = cartService.addToCart(userId, productId, 5);
 
             // when
@@ -193,7 +186,7 @@ class CartServiceIntegrationTest {
             // given
             Long userId = 1L;
             Long otherUserId = 2L;
-            Long productId = 1L;
+            Long productId = product1Id;
             CartItem cartItem = cartService.addToCart(userId, productId, 5);
 
             // when & then
@@ -209,7 +202,7 @@ class CartServiceIntegrationTest {
         void updateCartItemQuantity_exceedsStock_throwsException() {
             // given
             Long userId = 1L;
-            Long productId = 2L; // 재고 50개
+            Long productId = product2Id; // 재고 50개
             CartItem cartItem = cartService.addToCart(userId, productId, 5);
 
             // when & then
@@ -230,7 +223,7 @@ class CartServiceIntegrationTest {
         void removeCartItem_removedFromRepository() {
             // given
             Long userId = 1L;
-            Long productId = 1L;
+            Long productId = product1Id;
             CartItem cartItem = cartService.addToCart(userId, productId, 5);
 
             // when
@@ -247,7 +240,7 @@ class CartServiceIntegrationTest {
             // given
             Long userId = 1L;
             Long otherUserId = 2L;
-            Long productId = 1L;
+            Long productId = product1Id;
             CartItem cartItem = cartService.addToCart(userId, productId, 5);
 
             // when & then
@@ -271,15 +264,15 @@ class CartServiceIntegrationTest {
         void getCartItems_returnsAllUserCartItems() {
             // given
             Long userId = 1L;
-            cartService.addToCart(userId, 1L, 5);
-            cartService.addToCart(userId, 2L, 3);
+            cartService.addToCart(userId, product1Id, 5);
+            cartService.addToCart(userId, product2Id, 3);
 
             // when
             List<CartItem> cartItems = cartService.getCartItems(userId);
 
             // then
             assertThat(cartItems).hasSize(2);
-            assertThat(cartItems).extracting(CartItem::getProductId).containsExactlyInAnyOrder(1L, 2L);
+            assertThat(cartItems).extracting(CartItem::getProductId).containsExactlyInAnyOrder(product1Id, product2Id);
         }
 
         @Test
@@ -288,8 +281,8 @@ class CartServiceIntegrationTest {
             // given
             Long userId1 = 1L;
             Long userId2 = 2L;
-            cartService.addToCart(userId1, 1L, 5);
-            cartService.addToCart(userId2, 2L, 3);
+            cartService.addToCart(userId1, product1Id, 5);
+            cartService.addToCart(userId2, product2Id, 3);
 
             // when
             List<CartItem> user1CartItems = cartService.getCartItems(userId1);
@@ -297,10 +290,10 @@ class CartServiceIntegrationTest {
 
             // then
             assertThat(user1CartItems).hasSize(1);
-            assertThat(user1CartItems.get(0).getProductId()).isEqualTo(1L);
+            assertThat(user1CartItems.get(0).getProductId()).isEqualTo(product1Id);
 
             assertThat(user2CartItems).hasSize(1);
-            assertThat(user2CartItems.get(0).getProductId()).isEqualTo(2L);
+            assertThat(user2CartItems.get(0).getProductId()).isEqualTo(product2Id);
         }
 
         @Test
@@ -326,8 +319,8 @@ class CartServiceIntegrationTest {
         void clearCart_removesAllItems() {
             // given
             Long userId = 1L;
-            cartService.addToCart(userId, 1L, 5);
-            cartService.addToCart(userId, 2L, 3);
+            cartService.addToCart(userId, product1Id, 5);
+            cartService.addToCart(userId, product2Id, 3);
             assertThat(cartItemRepository.findAllByUserId(userId)).hasSize(2);
 
             // when
@@ -343,8 +336,8 @@ class CartServiceIntegrationTest {
             // given
             Long userId1 = 1L;
             Long userId2 = 2L;
-            cartService.addToCart(userId1, 1L, 5);
-            cartService.addToCart(userId2, 2L, 3);
+            cartService.addToCart(userId1, product1Id, 5);
+            cartService.addToCart(userId2, product2Id, 3);
 
             // when
             cartService.clearCart(userId1);
@@ -364,9 +357,9 @@ class CartServiceIntegrationTest {
         void removeCartItems_removesSpecificProducts() {
             // given
             Long userId = 1L;
-            cartService.addToCart(userId, 1L, 5);
-            cartService.addToCart(userId, 2L, 3);
-            List<Long> productIdsToRemove = List.of(1L);
+            cartService.addToCart(userId, product1Id, 5);
+            cartService.addToCart(userId, product2Id, 3);
+            List<Long> productIdsToRemove = List.of(product1Id);
 
             // when
             cartService.removeCartItems(userId, productIdsToRemove);
@@ -374,7 +367,7 @@ class CartServiceIntegrationTest {
             // then
             List<CartItem> remainingItems = cartItemRepository.findAllByUserId(userId);
             assertThat(remainingItems).hasSize(1);
-            assertThat(remainingItems.get(0).getProductId()).isEqualTo(2L);
+            assertThat(remainingItems.get(0).getProductId()).isEqualTo(product2Id);
         }
 
         @Test
@@ -382,9 +375,9 @@ class CartServiceIntegrationTest {
         void removeCartItems_removesMultipleProducts() {
             // given
             Long userId = 1L;
-            cartService.addToCart(userId, 1L, 5);
-            cartService.addToCart(userId, 2L, 3);
-            List<Long> productIdsToRemove = List.of(1L, 2L);
+            cartService.addToCart(userId, product1Id, 5);
+            cartService.addToCart(userId, product2Id, 3);
+            List<Long> productIdsToRemove = List.of(product1Id, product2Id);
 
             // when
             cartService.removeCartItems(userId, productIdsToRemove);
@@ -403,7 +396,7 @@ class CartServiceIntegrationTest {
         void fullLifecycleScenario() {
             // given
             Long userId = 1L;
-            Long productId = 1L;
+            Long productId = product1Id;
 
             // when - 추가
             CartItem added = cartService.addToCart(userId, productId, 5);
@@ -426,9 +419,9 @@ class CartServiceIntegrationTest {
             Long user2 = 2L;
 
             // when
-            cartService.addToCart(user1, 1L, 5);
-            cartService.addToCart(user2, 1L, 3);
-            cartService.addToCart(user1, 2L, 2);
+            cartService.addToCart(user1, product1Id, 5);
+            cartService.addToCart(user2, product1Id, 3);
+            cartService.addToCart(user1, product2Id, 2);
 
             // then
             List<CartItem> user1Cart = cartService.getCartItems(user1);
