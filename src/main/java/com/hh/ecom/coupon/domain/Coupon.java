@@ -106,13 +106,12 @@ public class Coupon {
         }
 
         int newAvailableQuantity = this.availableQuantity - 1;
-        CouponStatus newStatus = newAvailableQuantity == 0 ? CouponStatus.SOLD_OUT : this.status;
+        CouponStatus newStatus = (newAvailableQuantity == 0) ? CouponStatus.SOLD_OUT : this.status;
 
         return this.toBuilder()
                 .availableQuantity(newAvailableQuantity)
                 .status(newStatus)
                 .updatedAt(LocalDateTime.now())
-                // version은 JPA가 자동으로 관리 - 수동으로 증가시키지 않음
                 .build();
     }
 

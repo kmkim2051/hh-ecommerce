@@ -12,9 +12,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/**
- * JPA entity for Product
- * */
 @Entity
 @Table(name = "products")
 @Getter
@@ -42,14 +39,12 @@ public class ProductEntity {
     @Builder.Default
     private Integer viewCount = 0;
 
-    // Soft Delete
     @Column(nullable = false)
     @Builder.Default
     private Boolean isActive = true;
 
     private LocalDateTime deletedAt;
 
-    // Audit
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -58,7 +53,6 @@ public class ProductEntity {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    // Optimistic Lock
     @Version
     private Long version;
 

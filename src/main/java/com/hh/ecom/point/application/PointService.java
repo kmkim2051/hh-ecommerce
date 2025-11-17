@@ -31,7 +31,6 @@ public class PointService {
 
     private Point chargePointInternal(Long userId, BigDecimal amount) {
         try {
-            // 1. 포인트 계좌 조회 (비관적 락 적용)
             Point point = pointRepository.findByUserIdForUpdate(userId)
                     .orElseGet(() -> {
                         // 계좌가 없으면 새로 생성
@@ -39,23 +38,21 @@ public class PointService {
                         return pointRepository.save(newPoint);
                     });
 
-            // 2. 포인트 충전
             Point chargedPoint = point.charge(amount);
             Point savedPoint = pointRepository.save(chargedPoint);
 
-            // 3. 거래 이력 기록
             PointTransaction transaction = PointTransaction.create(
                     savedPoint.getId(),
                     amount,
                     TransactionType.CHARGE,
-                    null, // orderId 없음
+                    null,
                     savedPoint.getBalance()
             );
             transactionRepository.save(transaction);
 
             return savedPoint;
         } catch (DataIntegrityViolationException e) {
-            // 동시에 계좌 생성 시도로 unique constraint 위반 발생
+            // 동시에 계좌 생성 시도 -> unique constraint 위반 발생
             // 다시 조회하여 락을 획득하고 충전 재시도
             log.debug("포인트 계좌 동시 생성 감지, 재조회 후 처리. userId={}", userId);
 
@@ -96,25 +93,20 @@ public class PointService {
     }
 
     public List<PointTransaction> getTransactionHistory(Long userId) {
-        // 1. 포인트 계좌 조회
         Point point = pointRepository.findByUserId(userId)
                 .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND, "userId: " + userId));
 
-        // 2. 거래 이력 조회
         return transactionRepository.findByPointId(point.getId());
     }
 
     @Transactional
     public Point usePoint(Long userId, BigDecimal amount, Long orderId) {
-        // 1. 포인트 계좌 조회 (비관적 락 적용)
         Point point = pointRepository.findByUserIdForUpdate(userId)
                 .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND, "userId: " + userId));
 
-        // 2. 포인트 사용
         Point usedPoint = point.use(amount);
         Point savedPoint = pointRepository.save(usedPoint);
 
-        // 3. 거래 이력 기록
         PointTransaction transaction = PointTransaction.create(
                 savedPoint.getId(),
                 amount,
@@ -129,15 +121,12 @@ public class PointService {
 
     @Transactional
     public Point refundPoint(Long userId, BigDecimal amount, Long orderId) {
-        // 1. 포인트 계좌 조회 (비관적 락 적용)
         Point point = pointRepository.findByUserIdForUpdate(userId)
                 .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND, "userId: " + userId));
 
-        // 2. 포인트 환불
         Point refundedPoint = point.refund(amount);
         Point savedPoint = pointRepository.save(refundedPoint);
 
-        // 3. 거래 이력 기록
         PointTransaction transaction = PointTransaction.create(
                 savedPoint.getId(),
                 amount,
@@ -146,7 +135,6 @@ public class PointService {
                 savedPoint.getBalance()
         );
         transactionRepository.save(transaction);
-
         return savedPoint;
     }
 

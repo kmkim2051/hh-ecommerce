@@ -41,21 +41,21 @@ public class OrderItemInMemoryRepository implements OrderItemRepository {
         return storage.values().stream()
                 .map(OrderItemEntity::toDomain)
                 .filter(item -> item.getOrderId().equals(orderId))
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override
     public List<OrderItem> saveAll(List<OrderItem> orderItems) {
         return orderItems.stream()
                 .map(this::save)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override
     public List<OrderItem> findAll() {
         return storage.values().stream()
                 .map(OrderItemEntity::toDomain)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override
@@ -72,7 +72,7 @@ public class OrderItemInMemoryRepository implements OrderItemRepository {
                 .sorted(Map.Entry.<Long, Long>comparingByValue().reversed())
                 .limit(limit)
                 .map(entry -> ProductSalesCount.of(entry.getKey(), entry.getValue()))
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override
