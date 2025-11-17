@@ -14,10 +14,6 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/**
- * JPA Coupon Entity
- * Optimistic locking with @Version
- */
 @Entity
 @Table(name = "coupon")
 @Getter
@@ -63,10 +59,6 @@ public class CouponEntity {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    @Version
-    @Column(nullable = false)
-    private Long version;
-
     public Coupon toDomain() {
         return Coupon.builder()
                 .id(this.id)
@@ -80,7 +72,6 @@ public class CouponEntity {
                 .isActive(this.isActive)
                 .createdAt(this.createdAt)
                 .updatedAt(this.updatedAt)
-                // version은 Entity에서만 관리, Domain에 노출하지 않음
                 .build();
     }
 
@@ -97,7 +88,6 @@ public class CouponEntity {
                 .isActive(coupon.getIsActive())
                 .createdAt(coupon.getCreatedAt())
                 .updatedAt(coupon.getUpdatedAt())
-                // version은 JPA가 자동으로 관리 (save 시 자동 증가)
                 .build();
     }
 }

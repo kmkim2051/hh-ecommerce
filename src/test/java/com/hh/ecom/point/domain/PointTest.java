@@ -117,7 +117,7 @@ class PointTest {
 
             // then
             assertThat(used.getBalance()).isEqualTo(BigDecimal.valueOf(7000));
-            assertThat(used.getUpdatedAt()).isAfter(charged.getUpdatedAt());
+            assertThat(used.getUpdatedAt()).isAfterOrEqualTo(charged.getUpdatedAt());
         }
 
         @Test

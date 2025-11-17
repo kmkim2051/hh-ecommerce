@@ -10,7 +10,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 
 public class CouponUserInMemoryRepository implements CouponUserRepository {
     private final Map<Long, CouponUserEntity> couponUsers = new ConcurrentHashMap<>();
@@ -62,7 +61,7 @@ public class CouponUserInMemoryRepository implements CouponUserRepository {
         return couponUsers.values().stream()
                 .filter(entity -> entity.getUserId().equals(userId))
                 .map(CouponUserEntity::toDomain)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override
@@ -70,7 +69,7 @@ public class CouponUserInMemoryRepository implements CouponUserRepository {
         return couponUsers.values().stream()
                 .filter(entity -> Objects.equals(entity.getUserId(), userId) && entity.isUsed() == isUsed)
                 .map(CouponUserEntity::toDomain)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override

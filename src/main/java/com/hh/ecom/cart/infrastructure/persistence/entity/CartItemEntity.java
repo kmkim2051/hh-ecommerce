@@ -11,10 +11,6 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
-/**
- * CartItem JPA Entity
- * 낙관적 락(@Version)을 사용한 동시성 제어
- */
 @Entity
 @Table(name = "cart_items")
 @Getter

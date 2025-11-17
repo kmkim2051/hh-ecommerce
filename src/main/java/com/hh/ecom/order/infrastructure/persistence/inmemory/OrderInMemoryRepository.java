@@ -7,7 +7,6 @@ import com.hh.ecom.order.infrastructure.persistence.entity.OrderEntity;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 
 public class OrderInMemoryRepository implements OrderRepository {
 
@@ -41,14 +40,14 @@ public class OrderInMemoryRepository implements OrderRepository {
                 .map(OrderEntity::toDomain)
                 .filter(order -> order.getUserId().equals(userId))
                 .sorted(Comparator.comparing(Order::getCreatedAt).reversed())
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override
     public List<Order> findAll() {
         return storage.values().stream()
                 .map(OrderEntity::toDomain)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override

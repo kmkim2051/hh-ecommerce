@@ -19,12 +19,10 @@ public class PointRepositoryImpl implements PointRepository {
     public Point save(Point point) {
         PointEntity entity;
         if (point.getId() != null) {
-            // UPDATE: 기존 엔티티를 조회하여 version 보존
             entity = pointJpaRepository.findById(point.getId())
                     .map(existing -> updateEntity(existing, point))
                     .orElse(PointEntity.from(point));
         } else {
-            // INSERT: 새 엔티티 생성
             entity = PointEntity.from(point);
         }
         PointEntity saved = pointJpaRepository.save(entity);
@@ -37,7 +35,6 @@ public class PointRepositoryImpl implements PointRepository {
                 .userId(point.getUserId())
                 .balance(point.getBalance())
                 .updatedAt(point.getUpdatedAt())
-                .version(existing.getVersion())  // 기존 version 보존
                 .build();
     }
 

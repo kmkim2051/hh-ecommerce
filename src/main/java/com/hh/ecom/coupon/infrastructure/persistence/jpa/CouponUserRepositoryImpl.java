@@ -9,7 +9,6 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
@@ -66,14 +65,14 @@ public class CouponUserRepositoryImpl implements CouponUserRepository {
     public List<CouponUser> findByUserId(Long userId) {
         return couponUserJpaRepository.findByUserId(userId).stream()
                 .map(CouponUserEntity::toDomain)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override
     public List<CouponUser> findByUserIdAndIsUsed(Long userId, Boolean isUsed) {
         return couponUserJpaRepository.findByUserIdAndIsUsed(userId, isUsed).stream()
                 .map(CouponUserEntity::toDomain)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override

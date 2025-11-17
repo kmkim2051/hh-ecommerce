@@ -48,7 +48,6 @@ public class CouponRepositoryImpl implements CouponRepository {
                 .isActive(coupon.getIsActive())
                 .createdAt(existing.getCreatedAt())
                 .updatedAt(coupon.getUpdatedAt())
-                .version(existing.getVersion())  // 기존 version 보존
                 .build();
     }
 

@@ -66,10 +66,10 @@ class CouponControllerIntegrationTest extends TestContainersConfig {
         // then
         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getCoupons()).hasSize(1);
-        assertThat(response.getBody().getCoupons().get(0).getId()).isEqualTo(testCoupon.getId());
-        assertThat(response.getBody().getCoupons().get(0).getName()).isEqualTo("테스트 쿠폰");
-        assertThat(response.getBody().getCoupons().get(0).getDiscountAmount()).isEqualByComparingTo(BigDecimal.valueOf(5000));
+        assertThat(response.getBody().coupons()).hasSize(1);
+        assertThat(response.getBody().coupons().get(0).id()).isEqualTo(testCoupon.getId());
+        assertThat(response.getBody().coupons().get(0).name()).isEqualTo("테스트 쿠폰");
+        assertThat(response.getBody().coupons().get(0).discountAmount()).isEqualByComparingTo(BigDecimal.valueOf(5000));
     }
 
     @Test
@@ -81,9 +81,9 @@ class CouponControllerIntegrationTest extends TestContainersConfig {
         // then
         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getMessage()).isEqualTo("쿠폰이 발급되었습니다.");
-        assertThat(response.getBody().getCouponName()).isEqualTo("테스트 쿠폰");
-        assertThat(response.getBody().getDiscountAmount()).isEqualByComparingTo(BigDecimal.valueOf(5000));
+        assertThat(response.getBody().message()).isEqualTo("쿠폰이 발급되었습니다.");
+        assertThat(response.getBody().couponName()).isEqualTo("테스트 쿠폰");
+        assertThat(response.getBody().discountAmount()).isEqualByComparingTo(BigDecimal.valueOf(5000));
     }
 
     @Test
@@ -138,9 +138,9 @@ class CouponControllerIntegrationTest extends TestContainersConfig {
         // then
         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getCoupons()).hasSize(1);
-        assertThat(response.getBody().getCoupons().get(0).getCouponName()).isEqualTo("테스트 쿠폰");
-        assertThat(response.getBody().getCoupons().get(0).getIsUsed()).isFalse();
+        assertThat(response.getBody().coupons()).hasSize(1);
+        assertThat(response.getBody().coupons().get(0).couponName()).isEqualTo("테스트 쿠폰");
+        assertThat(response.getBody().coupons().get(0).isUsed()).isFalse();
     }
 
     @Test
@@ -157,6 +157,6 @@ class CouponControllerIntegrationTest extends TestContainersConfig {
         // then - 미사용 쿠폰만 조회
         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getCoupons()).isEmpty();
+        assertThat(response.getBody().coupons()).isEmpty();
     }
 }

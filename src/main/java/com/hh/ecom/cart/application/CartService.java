@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -24,56 +23,44 @@ public class CartService {
 
     @Transactional
     public CartItem addToCart(Long userId, Long productId, Integer quantity) {
-        // 1. 상품 조회 및 검증
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND, "ID: " + productId));
 
-        // 2. 상품 판매 가능 여부 확인
         if (!product.isAvailableForSale()) {
             throw new ProductException(ProductErrorCode.PRODUCT_NOT_AVAILABLE_FOR_SALE, "ID: " + productId);
         }
 
-        // 3. 재고 확인
         if (!product.hasEnoughStock(quantity)) {
             throw new CartException(CartErrorCode.QUANTITY_EXCEEDS_STOCK,
                     "요청 수량: " + quantity + ", 현재 재고: " + product.getStockQuantity());
         }
 
-        Optional<CartItem> existingItem = cartItemRepository.findByUserIdAndProductId(userId, productId);
+        return cartItemRepository.findByUserIdAndProductId(userId, productId)
+                .map(existCartItem -> {
+                    int newQuantity = existCartItem.getQuantity() + quantity;
 
-        if (existingItem.isPresent()) {
-            // 기존 아이템이 있으면 수량 증가
-            CartItem cartItem = existingItem.get();
-            int newQuantity = cartItem.getQuantity() + quantity;
+                    if (!product.hasEnoughStock(newQuantity)) {
+                        throw new CartException(CartErrorCode.QUANTITY_EXCEEDS_STOCK);
+                    }
 
-            // 증가된 수량도 재고 확인
-            if (!product.hasEnoughStock(newQuantity)) {
-                throw new CartException(CartErrorCode.QUANTITY_EXCEEDS_STOCK,
-                        "요청 수량: " + newQuantity + ", 현재 재고: " + product.getStockQuantity());
-            }
-
-            CartItem updatedItem = cartItem.updateQuantity(newQuantity);
-            return cartItemRepository.save(updatedItem);
-        } else {
-            // 새 아이템 추가
-            CartItem newItem = CartItem.create(userId, productId, quantity);
-            return cartItemRepository.save(newItem);
-        }
+                    return cartItemRepository.save(existCartItem.updateQuantity(newQuantity));
+                })
+                .orElseGet(() -> {
+                    CartItem newItem = CartItem.create(userId, productId, quantity);
+                    return cartItemRepository.save(newItem);
+                });
     }
 
     @Transactional
     public CartItem updateCartItemQuantity(Long cartItemId, Long userId, Integer newQuantity) {
-        // 1. 장바구니 아이템 조회
         CartItem cartItem = cartItemRepository.findById(cartItemId)
                 .orElseThrow(() -> new CartException(CartErrorCode.CART_ITEM_NOT_FOUND, "ID: " + cartItemId));
 
-        // 2. 권한 확인
         if (!cartItem.belongsToUser(userId)) {
             throw new CartException(CartErrorCode.UNAUTHORIZED_CART_ACCESS,
                     "User ID: " + userId + ", Cart Item User ID: " + cartItem.getUserId());
         }
 
-        // 3. 상품 재고 확인
         Product product = productRepository.findById(cartItem.getProductId())
                 .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND,
                         "ID: " + cartItem.getProductId()));
