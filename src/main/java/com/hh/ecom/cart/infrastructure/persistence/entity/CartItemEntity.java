@@ -1,27 +1,47 @@
 package com.hh.ecom.cart.infrastructure.persistence.entity;
 
 import com.hh.ecom.cart.domain.CartItem;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
 /**
- * In-Memory DB를 위한 POJO entity
- * JPA 도입 시 변경 예정
+ * CartItem JPA Entity
+ * 낙관적 락(@Version)을 사용한 동시성 제어
  */
+@Entity
+@Table(name = "cart_items")
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
 public class CartItemEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "user_id", nullable = false)
     private Long userId;
+
+    @Column(name = "product_id", nullable = false)
     private Long productId;
+
+    @Column(nullable = false)
     private Integer quantity;
+
+    @CreatedDate
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Version
+    private Long version;
 
     public CartItem toDomain() {
         return CartItem.builder()

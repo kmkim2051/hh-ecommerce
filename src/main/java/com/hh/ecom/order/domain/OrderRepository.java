@@ -10,4 +10,5 @@ public interface OrderRepository {
     List<Order> findByUserId(Long userId);
     List<Order> findAll();
     Optional<Order> findByOrderNumber(String orderNumber);
+    void deleteAll(); // for testing
 }

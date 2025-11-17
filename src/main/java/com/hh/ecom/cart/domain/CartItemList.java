@@ -1,11 +1,14 @@
 package com.hh.ecom.cart.domain;
 
+import com.hh.ecom.cart.domain.exception.CartErrorCode;
+import com.hh.ecom.cart.domain.exception.CartException;
 import com.hh.ecom.order.domain.exception.OrderErrorCode;
 import com.hh.ecom.order.domain.exception.OrderException;
 import com.hh.ecom.product.domain.Product;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -14,13 +17,21 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Getter
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class CartItemList {
     private List<CartItem> cartItemList;
 
     public static CartItemList from(List<CartItem> cartItemList) {
+        validateCartItemsExist(cartItemList);
         return new CartItemList(cartItemList);
+    }
+
+    private static void validateCartItemsExist(List<CartItem> findCartItems) {
+        if (findCartItems.isEmpty()) {
+            throw new CartException(CartErrorCode.CART_ITEM_NOT_FOUND);
+        }
     }
 
     public void validateCartItemOwnership(Long userId) {
@@ -53,7 +64,7 @@ public class CartItemList {
                 }));
     }
 
-    public void validateStockAvailability(List<Product> products) {
+    public void validateEnoughStock(List<Product> products) {
         if (isEmptyCart()) return;
 
         mapCartItemsToProducts(products).forEach((item, product) -> {

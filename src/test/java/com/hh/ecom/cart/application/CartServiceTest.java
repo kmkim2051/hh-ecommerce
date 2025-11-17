@@ -24,7 +24,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
@@ -473,7 +472,7 @@ class CartServiceTest {
             given(cartItemRepository.findById(cartItemId)).willReturn(Optional.of(cartItem));
 
             // when
-            CartItem result = cartService.getCartItem(cartItemId);
+            CartItem result = cartService.getCartItemById(cartItemId);
 
             // then
             assertThat(result.getId()).isEqualTo(cartItemId);
@@ -487,7 +486,7 @@ class CartServiceTest {
             given(cartItemRepository.findById(cartItemId)).willReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> cartService.getCartItem(cartItemId))
+            assertThatThrownBy(() -> cartService.getCartItemById(cartItemId))
                     .isInstanceOf(CartException.class)
                     .hasMessageContaining("장바구니 아이템을 찾을 수 없습니다")
                     .extracting("errorCode")

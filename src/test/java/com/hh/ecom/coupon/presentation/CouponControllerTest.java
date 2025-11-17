@@ -5,6 +5,7 @@ import com.hh.ecom.coupon.application.CouponService;
 import com.hh.ecom.coupon.domain.Coupon;
 import com.hh.ecom.coupon.domain.CouponStatus;
 import com.hh.ecom.coupon.domain.CouponUser;
+import com.hh.ecom.coupon.domain.CouponUserWithCoupon;
 import com.hh.ecom.coupon.domain.exception.CouponErrorCode;
 import com.hh.ecom.coupon.domain.exception.CouponException;
 import org.junit.jupiter.api.DisplayName;
@@ -193,9 +194,9 @@ class CouponControllerTest {
         CouponUser couponUser1 = createCouponUser(10L, userId, 1L, false);
         CouponUser couponUser2 = createCouponUser(11L, userId, 2L, false);
 
-        List<CouponService.CouponUserWithCoupon> myCoupons = List.of(
-                CouponService.CouponUserWithCoupon.of(couponUser1, coupon1),
-                CouponService.CouponUserWithCoupon.of(couponUser2, coupon2)
+        List<CouponUserWithCoupon> myCoupons = List.of(
+                CouponUserWithCoupon.of(couponUser1, coupon1),
+                CouponUserWithCoupon.of(couponUser2, coupon2)
         );
 
         given(couponService.getMyCoupons(userId)).willReturn(myCoupons);
@@ -249,7 +250,6 @@ class CouponControllerTest {
                 .isActive(true)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
-                .version(0L)
                 .build();
     }
 

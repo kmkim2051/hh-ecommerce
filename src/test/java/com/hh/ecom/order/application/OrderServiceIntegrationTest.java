@@ -2,16 +2,16 @@ package com.hh.ecom.order.application;
 
 import com.hh.ecom.cart.application.CartService;
 import com.hh.ecom.cart.domain.CartItem;
+import com.hh.ecom.config.TestContainersConfig;
 import com.hh.ecom.coupon.application.CouponService;
 import com.hh.ecom.coupon.domain.Coupon;
 import com.hh.ecom.coupon.domain.CouponStatus;
 import com.hh.ecom.coupon.domain.CouponUser;
+import com.hh.ecom.coupon.domain.CouponUserWithCoupon;
 import com.hh.ecom.order.application.dto.CreateOrderCommand;
 import com.hh.ecom.order.domain.*;
 import com.hh.ecom.order.domain.exception.OrderErrorCode;
 import com.hh.ecom.order.domain.exception.OrderException;
-import com.hh.ecom.order.infrastructure.OrderInMemoryRepository;
-import com.hh.ecom.order.infrastructure.OrderItemInMemoryRepository;
 import com.hh.ecom.point.application.PointService;
 import com.hh.ecom.point.domain.Point;
 import com.hh.ecom.product.application.ProductService;
@@ -19,9 +19,10 @@ import com.hh.ecom.product.domain.Product;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -32,40 +33,35 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
-class OrderServiceIntegrationTest {
+@SpringBootTest
+@DisplayName("OrderService 통합 테스트 (Service + Repository)")
+class OrderServiceIntegrationTest extends TestContainersConfig {
 
+    @Autowired
     private OrderService orderService;
-    private OrderInMemoryRepository orderRepository;
-    private OrderItemInMemoryRepository orderItemRepository;
 
-    @Mock
+    @Autowired
+    private OrderRepository orderRepository;
+
+    @Autowired
+    private OrderItemRepository orderItemRepository;
+
+    @MockitoBean
     private CartService cartService;
 
-    @Mock
+    @MockitoBean
     private ProductService productService;
 
-    @Mock
+    @MockitoBean
     private CouponService couponService;
 
-    @Mock
+    @MockitoBean
     private PointService pointService;
 
     @BeforeEach
     void setUp() {
-        orderRepository = new OrderInMemoryRepository();
-        orderItemRepository = new OrderItemInMemoryRepository();
-        orderService = new OrderService(
-                orderRepository,
-                orderItemRepository,
-                cartService,
-                productService,
-                couponService,
-                pointService
-        );
-
-        orderRepository.clear();
-        orderItemRepository.clear();
+        orderItemRepository.deleteAll();
+        orderRepository.deleteAll();
     }
 
     @Test
@@ -78,7 +74,7 @@ class OrderServiceIntegrationTest {
         CartItem cartItem = createCartItem(cartItemId, userId, productId, 2);
         Product product = createProduct(productId, "노트북", BigDecimal.valueOf(1500000), 10);
 
-        when(cartService.getCartItem(cartItemId)).thenReturn(cartItem);
+        when(cartService.getCartItemById(cartItemId)).thenReturn(cartItem);
         when(productService.getProductList(List.of(productId))).thenReturn(List.of(product));
         when(pointService.hasPointAccount(userId)).thenReturn(true);
         when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(5000000)));
@@ -120,11 +116,11 @@ class OrderServiceIntegrationTest {
         Coupon coupon = createCoupon(couponId, "할인쿠폰", BigDecimal.valueOf(5000));
         CouponUser couponUser = createCouponUser(couponUserId, userId, couponId, false);
 
-        when(cartService.getCartItem(cartItemId)).thenReturn(cartItem);
+        when(cartService.getCartItemById(cartItemId)).thenReturn(cartItem);
         when(productService.getProductList(List.of(productId))).thenReturn(List.of(product));
         when(couponService.getCoupon(couponId)).thenReturn(coupon);
         when(couponService.getAllMyCoupons(userId)).thenReturn(
-                List.of(CouponService.CouponUserWithCoupon.of(couponUser, coupon))
+                List.of(CouponUserWithCoupon.of(couponUser, coupon))
         );
         when(pointService.hasPointAccount(userId)).thenReturn(true);
         when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(100000)));
@@ -226,7 +222,7 @@ class OrderServiceIntegrationTest {
         assertThatThrownBy(() -> orderService.createOrder(userId, command))
                 .isInstanceOf(OrderException.class)
                 .extracting(ex -> ((OrderException) ex).getErrorCode())
-                .isEqualTo(OrderErrorCode.EMPTY_ORDER_ITEMS);
+                .isEqualTo(OrderErrorCode.EMPTY_ORDER_CART_ITEM);
 
         List<Order> orders = orderService.getOrders(userId);
         assertThat(orders).isEmpty();
@@ -242,7 +238,7 @@ class OrderServiceIntegrationTest {
         CartItem cartItem = createCartItem(cartItemId, userId, productId, 1);
         Product product = createProduct(productId, "고가상품", BigDecimal.valueOf(1000000), 10);
 
-        when(cartService.getCartItem(cartItemId)).thenReturn(cartItem);
+        when(cartService.getCartItemById(cartItemId)).thenReturn(cartItem);
         when(productService.getProductList(List.of(productId))).thenReturn(List.of(product));
         when(pointService.hasPointAccount(userId)).thenReturn(true);
         when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(50000)));
@@ -267,8 +263,9 @@ class OrderServiceIntegrationTest {
         CartItem cartItem = createCartItem(cartItemId, userId, productId, 10);
         Product product = createProduct(productId, "품절임박상품", BigDecimal.valueOf(10000), 5);
 
-        when(cartService.getCartItem(cartItemId)).thenReturn(cartItem);
+        when(cartService.getCartItemById(cartItemId)).thenReturn(cartItem);
         when(productService.getProductList(List.of(productId))).thenReturn(List.of(product));
+        when(pointService.hasPointAccount(userId)).thenReturn(true);
 
         CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), null);
 
@@ -313,8 +310,8 @@ class OrderServiceIntegrationTest {
         Product product1 = createProduct(productId1, "노트북", BigDecimal.valueOf(1500000), 10);
         Product product2 = createProduct(productId2, "마우스", BigDecimal.valueOf(50000), 20);
 
-        when(cartService.getCartItem(cartItemId1)).thenReturn(cartItem1);
-        when(cartService.getCartItem(cartItemId2)).thenReturn(cartItem2);
+        when(cartService.getCartItemById(cartItemId1)).thenReturn(cartItem1);
+        when(cartService.getCartItemById(cartItemId2)).thenReturn(cartItem2);
         when(productService.getProductList(List.of(productId1, productId2)))
                 .thenReturn(List.of(product1, product2));
         when(pointService.hasPointAccount(userId)).thenReturn(true);
@@ -343,7 +340,7 @@ class OrderServiceIntegrationTest {
         CartItem cartItem = createCartItem(cartItemId, userId, productId, 1);
         Product product = createProduct(productId, productName, price, 100);
 
-        lenient().when(cartService.getCartItem(cartItemId)).thenReturn(cartItem);
+        lenient().when(cartService.getCartItemById(cartItemId)).thenReturn(cartItem);
         lenient().when(productService.getProductList(List.of(productId))).thenReturn(List.of(product));
         lenient().when(pointService.hasPointAccount(userId)).thenReturn(true);
         lenient().when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(10000000)));
@@ -381,7 +378,6 @@ class OrderServiceIntegrationTest {
                 .id(userId)
                 .userId(userId)
                 .balance(balance)
-                .version(0L)
                 .updatedAt(LocalDateTime.now())
                 .build();
     }
@@ -399,7 +395,6 @@ class OrderServiceIntegrationTest {
                 .isActive(true)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
-                .version(0L)
                 .build();
     }
 

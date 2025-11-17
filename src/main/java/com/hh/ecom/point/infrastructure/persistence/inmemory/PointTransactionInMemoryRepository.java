@@ -1,9 +1,8 @@
-package com.hh.ecom.point.infrastructure.persistence;
+package com.hh.ecom.point.infrastructure.persistence.inmemory;
 
 import com.hh.ecom.point.domain.PointTransaction;
 import com.hh.ecom.point.domain.PointTransactionRepository;
 import com.hh.ecom.point.infrastructure.persistence.entity.PointTransactionEntity;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Map;
@@ -11,7 +10,6 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-@Repository
 public class PointTransactionInMemoryRepository implements PointTransactionRepository {
     private final Map<Long, PointTransactionEntity> transactions = new ConcurrentHashMap<>();
     private final AtomicLong idGenerator = new AtomicLong(1);

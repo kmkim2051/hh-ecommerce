@@ -4,6 +4,7 @@ import com.hh.ecom.cart.domain.CartItem;
 import com.hh.ecom.cart.domain.CartItemRepository;
 import com.hh.ecom.cart.domain.exception.CartErrorCode;
 import com.hh.ecom.cart.domain.exception.CartException;
+
 import com.hh.ecom.product.domain.Product;
 import com.hh.ecom.product.domain.ProductRepository;
 import com.hh.ecom.product.domain.exception.ProductErrorCode;
@@ -116,7 +117,7 @@ public class CartService {
     }
 
     @Transactional(readOnly = true)
-    public CartItem getCartItem(Long cartItemId) {
+    public CartItem getCartItemById(Long cartItemId) {
         return cartItemRepository.findById(cartItemId)
                 .orElseThrow(() -> new CartException(CartErrorCode.CART_ITEM_NOT_FOUND, "ID: " + cartItemId));
     }

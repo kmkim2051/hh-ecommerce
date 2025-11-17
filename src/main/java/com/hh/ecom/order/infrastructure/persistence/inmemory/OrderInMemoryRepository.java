@@ -1,16 +1,14 @@
-package com.hh.ecom.order.infrastructure;
+package com.hh.ecom.order.infrastructure.persistence.inmemory;
 
 import com.hh.ecom.order.domain.Order;
 import com.hh.ecom.order.domain.OrderRepository;
 import com.hh.ecom.order.infrastructure.persistence.entity.OrderEntity;
-import org.springframework.stereotype.Repository;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
-@Repository
 public class OrderInMemoryRepository implements OrderRepository {
 
     private final Map<Long, OrderEntity> storage = new ConcurrentHashMap<>();
@@ -59,6 +57,11 @@ public class OrderInMemoryRepository implements OrderRepository {
                 .map(OrderEntity::toDomain)
                 .filter(order -> order.getOrderNumber().equals(orderNumber))
                 .findFirst();
+    }
+
+    @Override
+    public void deleteAll() {
+        clear();
     }
 
     /**

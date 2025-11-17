@@ -1,9 +1,8 @@
-package com.hh.ecom.cart.infrastructure.persistence;
+package com.hh.ecom.cart.infrastructure.persistence.inmemory;
 
 import com.hh.ecom.cart.domain.CartItem;
 import com.hh.ecom.cart.domain.CartItemRepository;
 import com.hh.ecom.cart.infrastructure.persistence.entity.CartItemEntity;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Map;
@@ -11,7 +10,6 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-@Repository
 public class CartItemInMemoryRepository implements CartItemRepository {
     private final Map<Long, CartItemEntity> cartItems = new ConcurrentHashMap<>();
     private final AtomicLong idGenerator = new AtomicLong(1);
@@ -72,5 +70,10 @@ public class CartItemInMemoryRepository implements CartItemRepository {
     public void deleteAllByUserIdAndProductIdIn(Long userId, List<Long> productIds) {
         cartItems.values().removeIf(entity ->
                 entity.getUserId().equals(userId) && productIds.contains(entity.getProductId()));
+    }
+
+    @Override
+    public void deleteAll() {
+        cartItems.clear();
     }
 }

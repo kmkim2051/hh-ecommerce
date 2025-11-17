@@ -1,18 +1,17 @@
-package com.hh.ecom.coupon.infrastructure.persistence;
+package com.hh.ecom.coupon.infrastructure.persistence.inmemory;
 
 import com.hh.ecom.coupon.domain.CouponUser;
 import com.hh.ecom.coupon.domain.CouponUserRepository;
 import com.hh.ecom.coupon.infrastructure.persistence.entity.CouponUserEntity;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
-@Repository
 public class CouponUserInMemoryRepository implements CouponUserRepository {
     private final Map<Long, CouponUserEntity> couponUsers = new ConcurrentHashMap<>();
     private final AtomicLong idGenerator = new AtomicLong(1);
@@ -33,7 +32,7 @@ public class CouponUserInMemoryRepository implements CouponUserRepository {
                     .issuedAt(entity.getIssuedAt())
                     .usedAt(entity.getUsedAt())
                     .expireDate(entity.getExpireDate())
-                    .isUsed(entity.getIsUsed())
+                    .isUsed(entity.isUsed())
                     .build();
         } else {
             // 기존 쿠폰 업데이트
@@ -69,7 +68,7 @@ public class CouponUserInMemoryRepository implements CouponUserRepository {
     @Override
     public List<CouponUser> findByUserIdAndIsUsed(Long userId, Boolean isUsed) {
         return couponUsers.values().stream()
-                .filter(entity -> entity.getUserId().equals(userId) && entity.getIsUsed().equals(isUsed))
+                .filter(entity -> Objects.equals(entity.getUserId(), userId) && entity.isUsed() == isUsed)
                 .map(CouponUserEntity::toDomain)
                 .collect(Collectors.toList());
     }

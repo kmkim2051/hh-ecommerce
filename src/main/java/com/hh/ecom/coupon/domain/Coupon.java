@@ -29,8 +29,6 @@ public class Coupon {
     private final LocalDateTime createdAt;
     private final LocalDateTime updatedAt;
 
-    private final Long version;
-
     public static Coupon create(
             String name,
             BigDecimal discountAmount,
@@ -52,7 +50,6 @@ public class Coupon {
                 .isActive(true)
                 .createdAt(now)
                 .updatedAt(now)
-                .version(0L)
                 .build();
     }
 
@@ -115,7 +112,7 @@ public class Coupon {
                 .availableQuantity(newAvailableQuantity)
                 .status(newStatus)
                 .updatedAt(LocalDateTime.now())
-                .version(this.version + 1)
+                // version은 JPA가 자동으로 관리 - 수동으로 증가시키지 않음
                 .build();
     }
 
@@ -134,7 +131,7 @@ public class Coupon {
                 .availableQuantity(newAvailableQuantity)
                 .status(newStatus)
                 .updatedAt(LocalDateTime.now())
-                .version(this.version + 1)
+                // version은 JPA가 자동으로 관리 - 수동으로 증가시키지 않음
                 .build();
     }
 
@@ -145,7 +142,7 @@ public class Coupon {
         return this.toBuilder()
                 .status(CouponStatus.DISABLED)
                 .updatedAt(LocalDateTime.now())
-                .version(this.version + 1)
+                // version은 JPA가 자동으로 관리 - 수동으로 증가시키지 않음
                 .build();
     }
 

@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: ecom
+
+  # Testcontainers will override these values dynamically
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+#  sql:
+#    init:
+#      mode: always
+#      schema-locations: classpath:/schema.sql
+
+  jpa:
+    hibernate:
+      ddl-auto: create
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: false
+    show-sql: false
+
+logging:
+  level:
+    org.hibernate: warn
+    org.testcontainers: info
+    com.hh.ecom.coupon: debug

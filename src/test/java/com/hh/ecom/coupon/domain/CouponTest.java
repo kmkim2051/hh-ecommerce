@@ -41,7 +41,6 @@ class CouponTest {
             assertThat(coupon.getStartDate()).isEqualTo(startDate);
             assertThat(coupon.getEndDate()).isEqualTo(endDate);
             assertThat(coupon.getIsActive()).isTrue();
-            assertThat(coupon.getVersion()).isEqualTo(0L);
         }
 
         @Test
@@ -248,7 +247,6 @@ class CouponTest {
             // then
             assertThat(result.getAvailableQuantity()).isEqualTo(99);
             assertThat(result.getStatus()).isEqualTo(CouponStatus.ACTIVE);
-            assertThat(result.getVersion()).isEqualTo(1L);
             assertThat(result.getUpdatedAt()).isAfter(coupon.getUpdatedAt());
         }
 
@@ -337,7 +335,6 @@ class CouponTest {
             // then
             assertThat(result.getAvailableQuantity()).isEqualTo(100);
             assertThat(result.getStatus()).isEqualTo(CouponStatus.ACTIVE);
-            assertThat(result.getVersion()).isEqualTo(2L);
         }
 
         @Test
@@ -401,7 +398,6 @@ class CouponTest {
 
             // then
             assertThat(result.getStatus()).isEqualTo(CouponStatus.DISABLED);
-            assertThat(result.getVersion()).isEqualTo(1L);
             assertThat(result.getUpdatedAt()).isAfter(coupon.getUpdatedAt());
         }
     }

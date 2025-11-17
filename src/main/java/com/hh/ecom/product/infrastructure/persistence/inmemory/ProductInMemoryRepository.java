@@ -1,25 +1,17 @@
-package com.hh.ecom.product.infrastructure.persistence;
+package com.hh.ecom.product.infrastructure.persistence.inmemory;
 
-import com.hh.ecom.order.domain.OrderItem;
-import com.hh.ecom.order.domain.OrderItemRepository;
 import com.hh.ecom.product.domain.Product;
 import com.hh.ecom.product.domain.ProductRepository;
 import com.hh.ecom.product.infrastructure.persistence.entity.ProductEntity;
-import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Repository;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
-@Repository
-@RequiredArgsConstructor
 public class ProductInMemoryRepository implements ProductRepository {
     private final Map<Long, ProductEntity> products = new ConcurrentHashMap<>();
-    private final OrderItemRepository orderItemRepository;
 
     @Override
     public Page<Product> findAll(Pageable pageable) {
@@ -74,35 +66,21 @@ public class ProductInMemoryRepository implements ProductRepository {
 
     @Override
     public List<Product> findTopBySalesCount(Integer limit) {
-        if (limit == null || limit <= 0) {
-            return List.of();
-        }
-
-        List<OrderItem> allOrderItems = Optional.ofNullable(orderItemRepository.findAll())
-                .orElse(Collections.emptyList());
-
-        if (allOrderItems.isEmpty()) {
-            return List.of();
-        }
-
-        Map<Long, Long> productSalesCount = allOrderItems.stream()
-                .filter(Objects::nonNull)
-                .filter(item -> item.getProductId() != null && item.getQuantity() != null)
-                .collect(Collectors.groupingBy(
-                        OrderItem::getProductId,
-                        Collectors.summingLong(item -> item.getQuantity().longValue())
-                ));
-
-        if (productSalesCount.isEmpty()) {
-            return List.of();
-        }
-
-        return productSalesCount.entrySet().stream()
-                .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
-                .limit(limit)
-                .map(entry -> Optional.ofNullable(products.get(entry.getKey())))
-                .flatMap(Optional::stream)
-                .map(ProductEntity::toDomain)
-                .toList();
+        // InMemory 구현: OrderItem 집계가 필요하므로 빈 리스트 반환
+        // 실제 구현은 OrderItemRepository 의존성이 필요
+        return List.of();
     }
+
+    @Override
+    public Product save(Product product) {
+        ProductEntity entity = ProductEntity.from(product);
+        products.put(entity.getId(), entity);
+        return entity.toDomain();
+    }
+
+    @Override
+    public void deleteAll() {
+        products.clear();
+    }
+
 }

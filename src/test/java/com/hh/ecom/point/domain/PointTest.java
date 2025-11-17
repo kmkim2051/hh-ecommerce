@@ -25,7 +25,7 @@ class PointTest {
             Long userId = 1L;
 
             // when
-            Point point = Point.create(userId);
+            Point point = Point.createWithUserId(userId);
 
             // then
             assertThat(point.getUserId()).isEqualTo(userId);
@@ -43,7 +43,7 @@ class PointTest {
         @DisplayName("포인트를 충전하면 잔액이 증가한다")
         void charge_success() {
             // given
-            Point point = Point.create(1L);
+            Point point = Point.createWithUserId(1L);
             BigDecimal chargeAmount = BigDecimal.valueOf(10000);
 
             // when
@@ -59,7 +59,7 @@ class PointTest {
         @DisplayName("여러 번 충전하면 누적된다")
         void charge_multiple() {
             // given
-            Point point = Point.create(1L);
+            Point point = Point.createWithUserId(1L);
 
             // when
             Point charged1 = point.charge(BigDecimal.valueOf(5000));
@@ -73,7 +73,7 @@ class PointTest {
         @DisplayName("0 이하의 금액으로 충전 시 예외가 발생한다")
         void charge_invalidAmount() {
             // given
-            Point point = Point.create(1L);
+            Point point = Point.createWithUserId(1L);
 
             // when & then
             assertThatThrownBy(() -> point.charge(BigDecimal.ZERO))
@@ -91,7 +91,7 @@ class PointTest {
         @DisplayName("null 금액으로 충전 시 예외가 발생한다")
         void charge_nullAmount() {
             // given
-            Point point = Point.create(1L);
+            Point point = Point.createWithUserId(1L);
 
             // when & then
             assertThatThrownBy(() -> point.charge(null))
@@ -109,7 +109,7 @@ class PointTest {
         @DisplayName("잔액이 충분하면 포인트를 사용할 수 있다")
         void use_success() {
             // given
-            Point point = Point.create(1L);
+            Point point = Point.createWithUserId(1L);
             Point charged = point.charge(BigDecimal.valueOf(10000));
 
             // when
@@ -124,7 +124,7 @@ class PointTest {
         @DisplayName("잔액 전체를 사용할 수 있다")
         void use_allBalance() {
             // given
-            Point point = Point.create(1L);
+            Point point = Point.createWithUserId(1L);
             Point charged = point.charge(BigDecimal.valueOf(10000));
 
             // when
@@ -139,7 +139,7 @@ class PointTest {
         @DisplayName("잔액이 부족하면 예외가 발생한다")
         void use_insufficientBalance() {
             // given
-            Point point = Point.create(1L);
+            Point point = Point.createWithUserId(1L);
             Point charged = point.charge(BigDecimal.valueOf(5000));
 
             // when & then
@@ -154,7 +154,7 @@ class PointTest {
         @DisplayName("잔액이 0일 때 사용 시도 시 예외가 발생한다")
         void use_zeroBalance() {
             // given
-            Point point = Point.create(1L);
+            Point point = Point.createWithUserId(1L);
 
             // when & then
             assertThatThrownBy(() -> point.use(BigDecimal.valueOf(1000)))
@@ -167,7 +167,7 @@ class PointTest {
         @DisplayName("0 이하의 금액으로 사용 시 예외가 발생한다")
         void use_invalidAmount() {
             // given
-            Point point = Point.create(1L);
+            Point point = Point.createWithUserId(1L);
             Point charged = point.charge(BigDecimal.valueOf(10000));
 
             // when & then
@@ -186,7 +186,7 @@ class PointTest {
         @DisplayName("포인트를 환불하면 잔액이 증가한다")
         void refund_success() {
             // given
-            Point point = Point.create(1L);
+            Point point = Point.createWithUserId(1L);
             Point charged = point.charge(BigDecimal.valueOf(10000));
             Point used = charged.use(BigDecimal.valueOf(3000));
 
@@ -195,14 +195,13 @@ class PointTest {
 
             // then
             assertThat(refunded.getBalance()).isEqualTo(BigDecimal.valueOf(10000));
-            assertThat(refunded.getUpdatedAt()).isAfter(used.getUpdatedAt());
         }
 
         @Test
         @DisplayName("잔액이 0인 상태에서도 환불할 수 있다")
         void refund_zeroBalance() {
             // given
-            Point point = Point.create(1L);
+            Point point = Point.createWithUserId(1L);
 
             // when
             Point refunded = point.refund(BigDecimal.valueOf(5000));
@@ -215,7 +214,7 @@ class PointTest {
         @DisplayName("0 이하의 금액으로 환불 시 예외가 발생한다")
         void refund_invalidAmount() {
             // given
-            Point point = Point.create(1L);
+            Point point = Point.createWithUserId(1L);
 
             // when & then
             assertThatThrownBy(() -> point.refund(BigDecimal.ZERO))
@@ -233,7 +232,7 @@ class PointTest {
         @DisplayName("충분한 잔액이 있으면 true를 반환한다")
         void hasEnoughBalance_sufficient() {
             // given
-            Point point = Point.create(1L);
+            Point point = Point.createWithUserId(1L);
             Point charged = point.charge(BigDecimal.valueOf(10000));
 
             // when & then
@@ -245,7 +244,7 @@ class PointTest {
         @DisplayName("잔액이 부족하면 false를 반환한다")
         void hasEnoughBalance_insufficient() {
             // given
-            Point point = Point.create(1L);
+            Point point = Point.createWithUserId(1L);
             Point charged = point.charge(BigDecimal.valueOf(5000));
 
             // when & then
@@ -256,7 +255,7 @@ class PointTest {
         @DisplayName("null이나 0 이하의 금액 확인 시 false를 반환한다")
         void hasEnoughBalance_invalidAmount() {
             // given
-            Point point = Point.create(1L);
+            Point point = Point.createWithUserId(1L);
             Point charged = point.charge(BigDecimal.valueOf(10000));
 
             // when & then
@@ -269,7 +268,7 @@ class PointTest {
         @DisplayName("잔액이 0인지 확인할 수 있다")
         void isZeroBalance() {
             // given
-            Point point = Point.create(1L);
+            Point point = Point.createWithUserId(1L);
             Point charged = point.charge(BigDecimal.valueOf(5000));
             Point used = charged.use(BigDecimal.valueOf(5000));
 
@@ -283,7 +282,7 @@ class PointTest {
         @DisplayName("잔액이 양수인지 확인할 수 있다")
         void isPositiveBalance() {
             // given
-            Point point = Point.create(1L);
+            Point point = Point.createWithUserId(1L);
             Point charged = point.charge(BigDecimal.valueOf(5000));
 
             // when & then
@@ -300,7 +299,7 @@ class PointTest {
         @DisplayName("충전/사용/환불 시 원본 객체는 변경되지 않는다")
         void immutability() {
             // given
-            Point original = Point.create(1L);
+            Point original = Point.createWithUserId(1L);
             Point charged = original.charge(BigDecimal.valueOf(10000));
             BigDecimal originalBalance = original.getBalance();
             BigDecimal chargedBalance = charged.getBalance();

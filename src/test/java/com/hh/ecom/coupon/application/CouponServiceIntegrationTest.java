@@ -1,15 +1,19 @@
 package com.hh.ecom.coupon.application;
 
+import com.hh.ecom.config.TestContainersConfig;
 import com.hh.ecom.coupon.domain.Coupon;
+import com.hh.ecom.coupon.domain.CouponRepository;
 import com.hh.ecom.coupon.domain.CouponStatus;
 import com.hh.ecom.coupon.domain.CouponUser;
+import com.hh.ecom.coupon.domain.CouponUserRepository;
+import com.hh.ecom.coupon.domain.CouponUserWithCoupon;
 import com.hh.ecom.coupon.domain.exception.CouponErrorCode;
 import com.hh.ecom.coupon.domain.exception.CouponException;
-import com.hh.ecom.coupon.infrastructure.persistence.CouponInMemoryRepository;
-import com.hh.ecom.coupon.infrastructure.persistence.CouponUserInMemoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -17,21 +21,23 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
 
+@SpringBootTest
 @DisplayName("CouponService 통합 테스트 (Service + Repository)")
-class CouponServiceIntegrationTest {
+class CouponServiceIntegrationTest extends TestContainersConfig {
 
+    @Autowired
     private CouponService couponService;
-    private CouponInMemoryRepository couponRepository;
-    private CouponUserInMemoryRepository couponUserRepository;
+
+    @Autowired
+    private CouponRepository couponRepository;
+
+    @Autowired
+    private CouponUserRepository couponUserRepository;
 
     @BeforeEach
     void setUp() {
-        couponRepository = new CouponInMemoryRepository();
-        couponUserRepository = new CouponUserInMemoryRepository();
-        couponService = new CouponService(couponRepository, couponUserRepository);
-
-        couponRepository.deleteAll();
         couponUserRepository.deleteAll();
+        couponRepository.deleteAll();
     }
 
     @Test
@@ -49,14 +55,14 @@ class CouponServiceIntegrationTest {
         assertThat(issuedCoupon.getId()).isNotNull();
         assertThat(issuedCoupon.getUserId()).isEqualTo(userId);
         assertThat(issuedCoupon.getCouponId()).isEqualTo(coupon.getId());
-        assertThat(issuedCoupon.getIsUsed()).isFalse();
+        assertThat(issuedCoupon.isUsed()).isFalse();
 
         // 쿠폰 수량 감소 확인
         Coupon updatedCoupon = couponService.getCoupon(coupon.getId());
         assertThat(updatedCoupon.getAvailableQuantity()).isEqualTo(99);
 
         // 보유 쿠폰 조회
-        List<CouponService.CouponUserWithCoupon> myCoupons = couponService.getMyCoupons(userId);
+        List<CouponUserWithCoupon> myCoupons = couponService.getMyCoupons(userId);
         assertThat(myCoupons).hasSize(1);
         assertThat(myCoupons.get(0).getCouponUser().getId()).isEqualTo(issuedCoupon.getId());
         assertThat(myCoupons.get(0).getCoupon().getName()).isEqualTo("신규회원 할인 쿠폰");
@@ -121,8 +127,8 @@ class CouponServiceIntegrationTest {
         couponService.issueCoupon(user2, coupon1.getId());
 
         // Then
-        List<CouponService.CouponUserWithCoupon> user1Coupons = couponService.getMyCoupons(user1);
-        List<CouponService.CouponUserWithCoupon> user2Coupons = couponService.getMyCoupons(user2);
+        List<CouponUserWithCoupon> user1Coupons = couponService.getMyCoupons(user1);
+        List<CouponUserWithCoupon> user2Coupons = couponService.getMyCoupons(user2);
 
         assertThat(user1Coupons).hasSize(2);
         assertThat(user2Coupons).hasSize(1);
@@ -148,18 +154,18 @@ class CouponServiceIntegrationTest {
         CouponUser usedCoupon = couponService.useCoupon(issuedCoupon.getId(), orderId);
 
         // Then
-        assertThat(usedCoupon.getIsUsed()).isTrue();
+        assertThat(usedCoupon.isUsed()).isTrue();
         assertThat(usedCoupon.getOrderId()).isEqualTo(orderId);
         assertThat(usedCoupon.getUsedAt()).isNotNull();
 
         // 미사용 쿠폰 조회 시 제외됨
-        List<CouponService.CouponUserWithCoupon> unusedCoupons = couponService.getMyCoupons(userId);
+        List<CouponUserWithCoupon> unusedCoupons = couponService.getMyCoupons(userId);
         assertThat(unusedCoupons).isEmpty();
 
         // 전체 쿠폰 조회 시 포함됨
-        List<CouponService.CouponUserWithCoupon> allCoupons = couponService.getAllMyCoupons(userId);
+        List<CouponUserWithCoupon> allCoupons = couponService.getAllMyCoupons(userId);
         assertThat(allCoupons).hasSize(1);
-        assertThat(allCoupons.get(0).getCouponUser().getIsUsed()).isTrue();
+        assertThat(allCoupons.get(0).getCouponUser().isUsed()).isTrue();
     }
 
     @Test
@@ -308,11 +314,11 @@ class CouponServiceIntegrationTest {
         // user1 - 미사용 쿠폰 0개 (사용함)
         assertThat(couponService.getMyCoupons(user1)).isEmpty();
         assertThat(couponService.getAllMyCoupons(user1)).hasSize(1);
-        assertThat(couponService.getAllMyCoupons(user1).get(0).getCouponUser().getIsUsed()).isTrue();
+        assertThat(couponService.getAllMyCoupons(user1).get(0).getCouponUser().isUsed()).isTrue();
 
         // user2 - 미사용 쿠폰 1개
         assertThat(couponService.getMyCoupons(user2)).hasSize(1);
-        assertThat(couponService.getMyCoupons(user2).get(0).getCouponUser().getIsUsed()).isFalse();
+        assertThat(couponService.getMyCoupons(user2).get(0).getCouponUser().isUsed()).isFalse();
 
         // user3 - 미사용 쿠폰 1개
         assertThat(couponService.getMyCoupons(user3)).hasSize(1);
@@ -335,22 +341,24 @@ class CouponServiceIntegrationTest {
         couponService.issueCoupon(userId, coupon2.getId());
 
         // When
-        List<CouponService.CouponUserWithCoupon> myCoupons = couponService.getMyCoupons(userId);
+        List<CouponUserWithCoupon> myCoupons = couponService.getMyCoupons(userId);
 
         // Then
         assertThat(myCoupons).hasSize(2);
 
         // isSameCouponId 메서드 테스트
-        CouponService.CouponUserWithCoupon firstCoupon = myCoupons.get(0);
+        CouponUserWithCoupon firstCoupon = myCoupons.get(0);
         assertThat(firstCoupon.isSameCouponId(firstCoupon.getCoupon().getId())).isTrue();
         assertThat(firstCoupon.isSameCouponId(99999L)).isFalse();
 
         // Getter 메서드 테스트
         assertThat(firstCoupon.getCoupon()).isNotNull();
         assertThat(firstCoupon.getCouponUser()).isNotNull();
-        assertThat(firstCoupon.getCoupon().getDiscountAmount()).isIn(
-                BigDecimal.valueOf(5000), BigDecimal.valueOf(8000)
-        );
+        assertThat(firstCoupon.getCoupon().getDiscountAmount())
+                .isIn(
+                        new BigDecimal("5000.00"),
+                        new BigDecimal("8000.00")
+                );
     }
 
     // Helper methods

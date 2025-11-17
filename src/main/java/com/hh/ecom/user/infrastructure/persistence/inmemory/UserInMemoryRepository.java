@@ -1,16 +1,15 @@
-package com.hh.ecom.user.infrastructure.persistence;
+package com.hh.ecom.user.infrastructure.persistence.inmemory;
 
 import com.hh.ecom.user.domain.User;
 import com.hh.ecom.user.domain.UserRepository;
 import com.hh.ecom.user.infrastructure.persistence.entity.UserEntity;
-import org.springframework.stereotype.Repository;
 
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-@Repository
+
 public class UserInMemoryRepository implements UserRepository {
     private final Map<Long, UserEntity> users = new ConcurrentHashMap<>();
     private final AtomicLong idGenerator = new AtomicLong(1);
