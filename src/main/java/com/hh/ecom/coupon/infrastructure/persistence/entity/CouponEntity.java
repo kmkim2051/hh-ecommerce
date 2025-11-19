@@ -86,8 +86,17 @@ public class CouponEntity {
                 .startDate(coupon.getStartDate())
                 .endDate(coupon.getEndDate())
                 .isActive(coupon.getIsActive())
-                .createdAt(coupon.getCreatedAt())
-                .updatedAt(coupon.getUpdatedAt())
                 .build();
+    }
+
+    public void updateFrom(Coupon coupon) {
+        this.name = coupon.getName();
+        this.discountAmount = coupon.getDiscountAmount();
+        this.totalQuantity = coupon.getTotalQuantity();
+        this.availableQuantity = coupon.getAvailableQuantity();
+        this.status = coupon.getStatus();
+        this.startDate = coupon.getStartDate();
+        this.endDate = coupon.getEndDate();
+        this.isActive = coupon.getIsActive();
     }
 }

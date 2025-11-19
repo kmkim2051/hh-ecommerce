@@ -20,17 +20,9 @@ public class Point {
     private final LocalDateTime updatedAt;
 
     public static Point createWithUserId(Long userId) {
-        LocalDateTime now = LocalDateTime.now();
         return Point.builder()
                 .userId(userId)
                 .balance(BigDecimal.ZERO)
-                .updatedAt(now)
-                .build();
-    }
-
-    private Point withUpdate(PointBuilder builder) {
-        return builder
-                .updatedAt(LocalDateTime.now())
                 .build();
     }
 
@@ -47,9 +39,9 @@ public class Point {
 
     public Point charge(BigDecimal amount) {
         validateAmount(amount);
-        return withUpdate(this.toBuilder()
+        return this.toBuilder()
                 .balance(this.balance.add(amount))
-        );
+                .build();
     }
 
     public Point use(BigDecimal amount) {
@@ -58,16 +50,16 @@ public class Point {
             throw new PointException(PointErrorCode.INSUFFICIENT_BALANCE,
                     "요청: " + amount + ", 현재 잔액: " + this.balance);
         }
-        return withUpdate(this.toBuilder()
+        return this.toBuilder()
                 .balance(this.balance.subtract(amount))
-        );
+                .build();
     }
 
     public Point refund(BigDecimal amount) {
         validateAmount(amount);
-        return withUpdate(this.toBuilder()
+        return this.toBuilder()
                 .balance(this.balance.add(amount))
-        );
+                .build();
     }
 
     private void validateAmount(BigDecimal amount) {

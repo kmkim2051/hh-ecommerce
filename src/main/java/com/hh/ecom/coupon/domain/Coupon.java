@@ -26,8 +26,9 @@ public class Coupon {
     private final LocalDateTime endDate;
 
     private final Boolean isActive;
-    private final LocalDateTime createdAt;
-    private final LocalDateTime updatedAt;
+
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     public static Coupon create(
             String name,
@@ -38,7 +39,6 @@ public class Coupon {
     ) {
         validateCreateParams(name, discountAmount, totalQuantity, startDate, endDate);
 
-        LocalDateTime now = LocalDateTime.now();
         return Coupon.builder()
                 .name(name)
                 .discountAmount(discountAmount)
@@ -48,8 +48,6 @@ public class Coupon {
                 .startDate(startDate)
                 .endDate(endDate)
                 .isActive(true)
-                .createdAt(now)
-                .updatedAt(now)
                 .build();
     }
 
@@ -111,13 +109,9 @@ public class Coupon {
         return this.toBuilder()
                 .availableQuantity(newAvailableQuantity)
                 .status(newStatus)
-                .updatedAt(LocalDateTime.now())
                 .build();
     }
 
-    /**
-     * 쿠폰 수량 복원 (취소 시)
-     */
     public Coupon increaseQuantity() {
         if (availableQuantity >= totalQuantity) {
             throw new CouponException(CouponErrorCode.INVALID_QUANTITY, "복원할 수량이 초과되었습니다.");
@@ -129,25 +123,15 @@ public class Coupon {
         return this.toBuilder()
                 .availableQuantity(newAvailableQuantity)
                 .status(newStatus)
-                .updatedAt(LocalDateTime.now())
-                // version은 JPA가 자동으로 관리 - 수동으로 증가시키지 않음
                 .build();
     }
 
-    /**
-     * 쿠폰 비활성화
-     */
     public Coupon disable() {
         return this.toBuilder()
                 .status(CouponStatus.DISABLED)
-                .updatedAt(LocalDateTime.now())
-                // version은 JPA가 자동으로 관리 - 수동으로 증가시키지 않음
                 .build();
     }
 
-    /**
-     * 쿠폰이 발급 가능한 상태인지 확인
-     */
     public boolean isIssuable() {
         LocalDateTime now = LocalDateTime.now();
         return isActive
@@ -157,9 +141,6 @@ public class Coupon {
                 && !now.isAfter(endDate);
     }
 
-    /**
-     * 쿠폰이 만료되었는지 확인
-     */
     public boolean isExpired() {
         return LocalDateTime.now().isAfter(endDate);
     }

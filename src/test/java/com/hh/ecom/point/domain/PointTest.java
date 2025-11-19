@@ -30,7 +30,6 @@ class PointTest {
             // then
             assertThat(point.getUserId()).isEqualTo(userId);
             assertThat(point.getBalance()).isEqualTo(BigDecimal.ZERO);
-            assertThat(point.getUpdatedAt()).isNotNull();
             assertThat(point.isZeroBalance()).isTrue();
         }
     }
@@ -51,7 +50,6 @@ class PointTest {
 
             // then
             assertThat(charged.getBalance()).isEqualTo(BigDecimal.valueOf(10000));
-            assertThat(charged.getUpdatedAt()).isAfter(point.getUpdatedAt());
             assertThat(charged.isPositiveBalance()).isTrue();
         }
 
@@ -117,7 +115,6 @@ class PointTest {
 
             // then
             assertThat(used.getBalance()).isEqualTo(BigDecimal.valueOf(7000));
-            assertThat(used.getUpdatedAt()).isAfterOrEqualTo(charged.getUpdatedAt());
         }
 
         @Test

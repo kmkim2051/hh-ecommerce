@@ -21,8 +21,7 @@ public class ProductService {
     }
 
     public Product getProduct(Long id) {
-        return productRepository.findById(id)
-                .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND, "ID: " + id));
+        return findProductById(id);
     }
 
     public List<Product> getProductList(List<Long> ids) {
@@ -30,8 +29,7 @@ public class ProductService {
     }
 
     public Product getProductStock(Long id) {
-        return productRepository.findById(id)
-                .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND, "ID: " + id));
+        return findProductById(id);
     }
 
     public List<Product> getProductsByViewCount(Integer limit) {
@@ -40,5 +38,10 @@ public class ProductService {
 
     public List<Product> getProductsBySalesCount(Integer limit) {
         return productRepository.findTopBySalesCount(limit);
+    }
+
+    private Product findProductById(Long id) {
+        return productRepository.findById(id)
+                .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND, "ID: " + id));
     }
 }

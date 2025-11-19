@@ -247,7 +247,6 @@ class CouponTest {
             // then
             assertThat(result.getAvailableQuantity()).isEqualTo(99);
             assertThat(result.getStatus()).isEqualTo(CouponStatus.ACTIVE);
-            assertThat(result.getUpdatedAt()).isAfter(coupon.getUpdatedAt());
         }
 
         @Test
@@ -398,7 +397,6 @@ class CouponTest {
 
             // then
             assertThat(result.getStatus()).isEqualTo(CouponStatus.DISABLED);
-            assertThat(result.getUpdatedAt()).isAfter(coupon.getUpdatedAt());
         }
     }
 
