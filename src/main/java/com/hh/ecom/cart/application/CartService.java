@@ -23,8 +23,7 @@ public class CartService {
 
     @Transactional
     public CartItem addToCart(Long userId, Long productId, Integer quantity) {
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND, "ID: " + productId));
+        Product product = findProductById(productId);
 
         if (!product.isAvailableForSale()) {
             throw new ProductException(ProductErrorCode.PRODUCT_NOT_AVAILABLE_FOR_SALE, "ID: " + productId);
@@ -61,9 +60,7 @@ public class CartService {
                     "User ID: " + userId + ", Cart Item User ID: " + cartItem.getUserId());
         }
 
-        Product product = productRepository.findById(cartItem.getProductId())
-                .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND,
-                        "ID: " + cartItem.getProductId()));
+        Product product = findProductById(cartItem.getProductId());
 
         if (!product.hasEnoughStock(newQuantity)) {
             throw new CartException(CartErrorCode.QUANTITY_EXCEEDS_STOCK,
@@ -107,5 +104,10 @@ public class CartService {
     public CartItem getCartItemById(Long cartItemId) {
         return cartItemRepository.findById(cartItemId)
                 .orElseThrow(() -> new CartException(CartErrorCode.CART_ITEM_NOT_FOUND, "ID: " + cartItemId));
+    }
+
+    private Product findProductById(Long productId) {
+        return productRepository.findById(productId)
+                .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND, "ID: " + productId));
     }
 }

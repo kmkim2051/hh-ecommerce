@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
 
 @Slf4j
 @Service
@@ -76,33 +75,34 @@ public class PointService {
         }
     }
 
+    @Transactional(readOnly = true)
     public Point getPoint(Long userId) {
-        return pointRepository.findByUserId(userId)
-                .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND, "userId: " + userId));
+        return findPointByUserId(userId);
     }
 
+    @Transactional(readOnly = true)
     public BigDecimal getBalance(Long userId) {
-        return Optional.ofNullable(getPoint(userId))
+        return pointRepository.findByUserId(userId)
                 .map(Point::getBalance)
                 .orElse(BigDecimal.ZERO);
     }
 
+    @Transactional(readOnly = true)
     public Point getPointById(Long pointId) {
         return pointRepository.findById(pointId)
                 .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND, "pointId: " + pointId));
     }
 
+    @Transactional(readOnly = true)
     public List<PointTransaction> getTransactionHistory(Long userId) {
-        Point point = pointRepository.findByUserId(userId)
-                .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND, "userId: " + userId));
+        Point point = findPointByUserId(userId);
 
         return transactionRepository.findByPointId(point.getId());
     }
 
     @Transactional
     public Point usePoint(Long userId, BigDecimal amount, Long orderId) {
-        Point point = pointRepository.findByUserIdForUpdate(userId)
-                .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND, "userId: " + userId));
+        Point point = findPointByUserIdWithLock(userId);
 
         Point usedPoint = point.use(amount);
         Point savedPoint = pointRepository.save(usedPoint);
@@ -121,8 +121,7 @@ public class PointService {
 
     @Transactional
     public Point refundPoint(Long userId, BigDecimal amount, Long orderId) {
-        Point point = pointRepository.findByUserIdForUpdate(userId)
-                .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND, "userId: " + userId));
+        Point point = findPointByUserIdWithLock(userId);
 
         Point refundedPoint = point.refund(amount);
         Point savedPoint = pointRepository.save(refundedPoint);
@@ -140,5 +139,15 @@ public class PointService {
 
     public boolean hasPointAccount(Long userId) {
         return pointRepository.findByUserId(userId).isPresent();
+    }
+
+    private Point findPointByUserId(Long userId) {
+        return pointRepository.findByUserId(userId)
+                .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND, "userId: " + userId));
+    }
+
+    private Point findPointByUserIdWithLock(Long userId) {
+        return pointRepository.findByUserIdForUpdate(userId)
+                .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND, "userId: " + userId));
     }
 }

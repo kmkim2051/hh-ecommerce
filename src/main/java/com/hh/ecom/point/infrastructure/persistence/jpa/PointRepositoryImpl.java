@@ -18,24 +18,27 @@ public class PointRepositoryImpl implements PointRepository {
     @Override
     public Point save(Point point) {
         PointEntity entity;
+
         if (point.getId() != null) {
-            entity = pointJpaRepository.findById(point.getId())
-                    .map(existing -> updateEntity(existing, point))
-                    .orElse(PointEntity.from(point));
+            // UPDATE: 기존 Entity 조회 및 업데이트
+            PointEntity existing = pointJpaRepository.findById(point.getId())
+                    .orElseThrow(() -> new RuntimeException(
+                            "수정할 포인트를 찾을 수 없습니다. id=" + point.getId()
+                    ));
+            updateEntity(existing, point);
+            entity = existing;
         } else {
+            // INSERT: 새 Entity 생성
             entity = PointEntity.from(point);
         }
+
         PointEntity saved = pointJpaRepository.save(entity);
         return saved.toDomain();
     }
 
-    private PointEntity updateEntity(PointEntity existing, Point point) {
-        return PointEntity.builder()
-                .id(existing.getId())
-                .userId(point.getUserId())
-                .balance(point.getBalance())
-                .updatedAt(point.getUpdatedAt())
-                .build();
+    private void updateEntity(PointEntity existing, Point point) {
+        // 영속 Entity를 직접 수정 (JPA Dirty Checking 활용)
+        existing.updateFrom(point);
     }
 
     @Override

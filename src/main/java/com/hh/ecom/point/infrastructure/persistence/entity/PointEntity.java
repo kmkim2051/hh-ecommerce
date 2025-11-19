@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -30,6 +31,10 @@ public class PointEntity {
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal balance;
 
+    @CreatedDate
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
     @LastModifiedDate
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
@@ -48,7 +53,11 @@ public class PointEntity {
                 .id(point.getId())
                 .userId(point.getUserId())
                 .balance(point.getBalance())
-                .updatedAt(point.getUpdatedAt())
                 .build();
+    }
+
+    public void updateFrom(Point point) {
+        this.userId = point.getUserId();
+        this.balance = point.getBalance();
     }
 }

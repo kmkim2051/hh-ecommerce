@@ -22,33 +22,27 @@ public class CouponRepositoryImpl implements CouponRepository {
     @Override
     public Coupon save(Coupon coupon) {
         CouponEntity entity;
+
         if (coupon.getId() != null) {
-            // UPDATE: 기존 엔티티를 조회하여 version 보존
-            entity = couponJpaRepository.findById(coupon.getId())
-                    .map(existing -> updateEntity(existing, coupon))
-                    .orElse(CouponEntity.from(coupon));
+            // UPDATE: 기존 Entity 조회 및 업데이트
+            CouponEntity existing = couponJpaRepository.findById(coupon.getId())
+                    .orElseThrow(() -> new RuntimeException(
+                            "수정할 쿠폰을 찾을 수 없습니다. id=" + coupon.getId()
+                    ));
+            updateEntity(existing, coupon);
+            entity = existing;
         } else {
-            // INSERT: 새 엔티티 생성
+            // INSERT: 새 Entity 생성
             entity = CouponEntity.from(coupon);
         }
+
         CouponEntity savedEntity = couponJpaRepository.save(entity);
         return savedEntity.toDomain();
     }
 
-    private CouponEntity updateEntity(CouponEntity existing, Coupon coupon) {
-        return CouponEntity.builder()
-                .id(existing.getId())
-                .name(coupon.getName())
-                .discountAmount(coupon.getDiscountAmount())
-                .totalQuantity(coupon.getTotalQuantity())
-                .availableQuantity(coupon.getAvailableQuantity())
-                .status(coupon.getStatus())
-                .startDate(coupon.getStartDate())
-                .endDate(coupon.getEndDate())
-                .isActive(coupon.getIsActive())
-                .createdAt(existing.getCreatedAt())
-                .updatedAt(coupon.getUpdatedAt())
-                .build();
+    private void updateEntity(CouponEntity existing, Coupon coupon) {
+        // 영속 Entity를 직접 수정 (JPA Dirty Checking 활용)
+        existing.updateFrom(coupon);
     }
 
     @Override
