@@ -118,7 +118,7 @@ public class PointService {
             transactionRepository.save(transaction);
 
             return savedPoint;
-        }, 5);
+        });
     }
 
     public Point refundPoint(Long userId, BigDecimal amount, Long orderId) {
@@ -137,7 +137,7 @@ public class PointService {
             );
             transactionRepository.save(transaction);
             return savedPoint;
-        }, 5);
+        });
     }
 
     public boolean hasPointAccount(Long userId) {
