@@ -54,12 +54,6 @@ public class PointRepositoryImpl implements PointRepository {
     }
 
     @Override
-    public Optional<Point> findByUserIdForUpdate(Long userId) {
-        return pointJpaRepository.findByUserIdWithLock(userId)
-                .map(PointEntity::toDomain);
-    }
-
-    @Override
     public void deleteAll() {
         pointJpaRepository.deleteAll();
     }

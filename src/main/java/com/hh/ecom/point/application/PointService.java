@@ -1,5 +1,6 @@
 package com.hh.ecom.point.application;
 
+import com.hh.ecom.common.transaction.OptimisticLockRetryExecutor;
 import com.hh.ecom.point.domain.Point;
 import com.hh.ecom.point.domain.PointRepository;
 import com.hh.ecom.point.domain.PointTransaction;
@@ -22,15 +23,15 @@ import java.util.List;
 public class PointService {
     private final PointRepository pointRepository;
     private final PointTransactionRepository transactionRepository;
+    private final OptimisticLockRetryExecutor retryExecutor;
 
-    @Transactional
     public Point chargePoint(Long userId, BigDecimal amount) {
-        return chargePointInternal(userId, amount);
+        return retryExecutor.execute(() -> chargePointInternal(userId, amount), 5);
     }
 
     private Point chargePointInternal(Long userId, BigDecimal amount) {
         try {
-            Point point = pointRepository.findByUserIdForUpdate(userId)
+            Point point = pointRepository.findByUserId(userId)
                     .orElseGet(() -> {
                         // 계좌가 없으면 새로 생성
                         Point newPoint = Point.createWithUserId(userId);
@@ -52,11 +53,11 @@ public class PointService {
             return savedPoint;
         } catch (DataIntegrityViolationException e) {
             // 동시에 계좌 생성 시도 -> unique constraint 위반 발생
-            // 다시 조회하여 락을 획득하고 충전 재시도
+            // 다시 조회하고 충전 재시도
             log.debug("포인트 계좌 동시 생성 감지, 재조회 후 처리. userId={}", userId);
 
-            // 이미 다른 트랜잭션이 생성한 계좌를 락과 함께 조회
-            Point point = pointRepository.findByUserIdForUpdate(userId)
+            // 이미 다른 트랜잭션이 생성한 계좌를 조회
+            Point point = pointRepository.findByUserId(userId)
                     .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND));
 
             Point chargedPoint = point.charge(amount);
@@ -100,41 +101,43 @@ public class PointService {
         return transactionRepository.findByPointId(point.getId());
     }
 
-    @Transactional
     public Point usePoint(Long userId, BigDecimal amount, Long orderId) {
-        Point point = findPointByUserIdWithLock(userId);
+        return retryExecutor.execute(() -> {
+            Point point = findPointByUserId(userId);
 
-        Point usedPoint = point.use(amount);
-        Point savedPoint = pointRepository.save(usedPoint);
+            Point usedPoint = point.use(amount);
+            Point savedPoint = pointRepository.save(usedPoint);
 
-        PointTransaction transaction = PointTransaction.create(
-                savedPoint.getId(),
-                amount,
-                TransactionType.USE,
-                orderId,
-                savedPoint.getBalance()
-        );
-        transactionRepository.save(transaction);
+            PointTransaction transaction = PointTransaction.create(
+                    savedPoint.getId(),
+                    amount,
+                    TransactionType.USE,
+                    orderId,
+                    savedPoint.getBalance()
+            );
+            transactionRepository.save(transaction);
 
-        return savedPoint;
+            return savedPoint;
+        }, 5);
     }
 
-    @Transactional
     public Point refundPoint(Long userId, BigDecimal amount, Long orderId) {
-        Point point = findPointByUserIdWithLock(userId);
+        return retryExecutor.execute(() -> {
+            Point point = findPointByUserId(userId);
 
-        Point refundedPoint = point.refund(amount);
-        Point savedPoint = pointRepository.save(refundedPoint);
+            Point refundedPoint = point.refund(amount);
+            Point savedPoint = pointRepository.save(refundedPoint);
 
-        PointTransaction transaction = PointTransaction.create(
-                savedPoint.getId(),
-                amount,
-                TransactionType.REFUND,
-                orderId,
-                savedPoint.getBalance()
-        );
-        transactionRepository.save(transaction);
-        return savedPoint;
+            PointTransaction transaction = PointTransaction.create(
+                    savedPoint.getId(),
+                    amount,
+                    TransactionType.REFUND,
+                    orderId,
+                    savedPoint.getBalance()
+            );
+            transactionRepository.save(transaction);
+            return savedPoint;
+        }, 5);
     }
 
     public boolean hasPointAccount(Long userId) {
@@ -143,11 +146,6 @@ public class PointService {
 
     private Point findPointByUserId(Long userId) {
         return pointRepository.findByUserId(userId)
-                .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND, "userId: " + userId));
-    }
-
-    private Point findPointByUserIdWithLock(Long userId) {
-        return pointRepository.findByUserIdForUpdate(userId)
                 .orElseThrow(() -> new PointException(PointErrorCode.POINT_NOT_FOUND, "userId: " + userId));
     }
 }
