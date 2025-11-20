@@ -1,6 +1,8 @@
 package com.hh.ecom.cart.application;
 
+import com.hh.ecom.cart.application.dto.OrderPreparationResult;
 import com.hh.ecom.cart.domain.CartItem;
+import com.hh.ecom.cart.domain.CartItemList;
 import com.hh.ecom.cart.domain.CartItemRepository;
 import com.hh.ecom.cart.domain.exception.CartErrorCode;
 import com.hh.ecom.cart.domain.exception.CartException;
@@ -13,7 +15,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -109,5 +114,42 @@ public class CartService {
     private Product findProductById(Long productId) {
         return productRepository.findById(productId)
                 .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND, "ID: " + productId));
+    }
+
+    @Transactional(readOnly = true)
+    public OrderPreparationResult prepareOrderFromCart(Long userId, List<Long> cartItemIds) {
+        List<CartItem> cartItems = cartItemIds.stream()
+                .map(this::getCartItemById)
+                .toList();
+
+        CartItemList cartItemList = CartItemList.from(cartItems);
+
+        cartItemList.validateCartItemOwnership(userId);
+
+        List<Long> productIds = cartItemList.getProductIdList();
+        List<Product> products = productRepository.findByIdsIn(productIds);
+
+        cartItemList.validateEnoughStock(products);
+
+        BigDecimal totalAmount = cartItemList.calculateTotalPrice(products);
+
+        Map<Long, Integer> productQuantities = cartItems.stream()
+                .collect(Collectors.toMap(
+                        CartItem::getProductId,
+                        CartItem::getQuantity,
+                        Integer::sum
+                ));
+
+        return OrderPreparationResult.of(
+                cartItems,
+                totalAmount,
+                productIds,
+                productQuantities
+        );
+    }
+
+    @Transactional
+    public void completeOrderCheckout(Long userId, List<Long> productIds) {
+        cartItemRepository.deleteAllByUserIdAndProductIdIn(userId, productIds);
     }
 }

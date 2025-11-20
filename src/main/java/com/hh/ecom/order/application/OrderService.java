@@ -1,8 +1,8 @@
 package com.hh.ecom.order.application;
 
 import com.hh.ecom.cart.application.CartService;
+import com.hh.ecom.cart.application.dto.OrderPreparationResult;
 import com.hh.ecom.cart.domain.CartItem;
-import com.hh.ecom.cart.domain.CartItemList;
 import com.hh.ecom.coupon.application.CouponCommandService;
 import com.hh.ecom.coupon.application.CouponQueryService;
 import com.hh.ecom.coupon.domain.Coupon;
@@ -44,28 +44,20 @@ public class OrderService {
         createOrderCommand.validate();
         validateOrderPaymentAbility(userId);
 
-        // cart item 기반으로 order 주문
         List<Long> cartItemIds = createOrderCommand.cartItemIds();
         final Long couponId = createOrderCommand.couponId();
-        log.info("order 생성 시작합니다. (userId: {}, create command: {})", userId, createOrderCommand );
+        log.info("order 생성 시작합니다. (userId: {}, create command: {})", userId, createOrderCommand);
 
-        List<CartItem> findCartItems = cartItemIds.stream()
-                .map(cartService::getCartItemById)
-                .toList();
+        OrderPreparationResult preparationResult = cartService.prepareOrderFromCart(userId, cartItemIds);
 
-        validateCartItemsInOrderExists(findCartItems);
-
-        CartItemList cart = CartItemList.from(findCartItems);
-        cart.validateCartItemOwnership(userId);
-
-        List<Product> products = productService.getProductList(cart.getProductIdList());
-        cart.validateEnoughStock(products);
+        List<CartItem> validatedCartItems = preparationResult.getValidatedCartItems();
+        BigDecimal totalAmount = preparationResult.getTotalAmount();
+        List<Long> productIds = preparationResult.getProductIds();
 
         DiscountInfo discountInfo = calculateDiscountInfo(userId, couponId);
         BigDecimal discountAmount = discountInfo.discountAmount();
         Long couponUserId = discountInfo.couponUserId();
 
-        final BigDecimal totalAmount = cart.calculateTotalPrice(products);
         final BigDecimal finalAmount = calculateValidFinalAmount(totalAmount, discountAmount);
 
         BigDecimal userBalance = Optional.ofNullable(pointService.getPoint(userId))
@@ -78,20 +70,22 @@ public class OrderService {
         Order order = Order.create(userId, orderNumber, totalAmount, discountAmount, couponUserId);
         Order savedOrder = orderRepository.save(order);
 
+        List<Product> products = productService.getProductList(productIds);
         Map<Long, Product> productMap = products.stream()
                 .collect(Collectors.toMap(Product::getId, Function.identity()));
 
-        List<OrderItem> savedOrderItems = saveAndGetOrderItemList(findCartItems, productMap, savedOrder);
+        List<OrderItem> savedOrderItems = saveAndGetOrderItemList(validatedCartItems, productMap, savedOrder);
 
-        decreaseProductStockInCart(findCartItems, productMap);
+        decreaseProductStockInCart(validatedCartItems, productMap);
 
         usePoint(userId, finalAmount, savedOrder);
+
         useCoupon(couponUserId, savedOrder);
 
         Order paidOrder = savedOrder.processPayment();
         Order updatedOrder = orderRepository.save(paidOrder);
 
-        removeCartItemsOfUser(userId, cartItemIds, findCartItems);
+        cartService.completeOrderCheckout(userId, productIds);
 
         return updatedOrder.setOrderItems(savedOrderItems);
     }
@@ -210,22 +204,6 @@ public class OrderService {
     private void validateOrderPaymentAbility(Long userId) {
         if (!pointService.hasPointAccount(userId)) {
             throw new OrderException(OrderErrorCode.INVALID_ORDER_STATUS, "포인트 계정이 없습니다. 포인트를 충전해주세요.");
-        }
-    }
-
-    private void removeCartItemsOfUser(Long userId, List<Long> cartItemIds, List<CartItem> cartItems) {
-        cartService.removeCartItems(userId, cartItemIds.stream()
-                .map(id -> cartItems.stream()
-                        .filter(ci -> Objects.equals(ci.getId(), id))
-                        .findFirst()
-                        .map(CartItem::getProductId)
-                        .orElse(null))
-                .filter(Objects::nonNull)
-                .toList());
-    }
-    private static void validateCartItemsInOrderExists(List<CartItem> findCartItems) {
-        if (findCartItems.isEmpty()) {
-            throw new OrderException(OrderErrorCode.EMPTY_ORDER_CART_ITEM);
         }
     }
 }
