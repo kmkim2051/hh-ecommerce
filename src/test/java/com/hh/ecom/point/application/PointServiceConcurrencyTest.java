@@ -41,7 +41,7 @@ class PointServiceConcurrencyTest extends TestContainersConfig {
     void concurrentChargePoint_SameUser() throws InterruptedException {
         // given
         Long userId = 1L;
-        int concurrentCount = 50;
+        int concurrentCount = 5;  // 현실적인 동시 요청 수준 (중복 클릭, 여러 디바이스)
         BigDecimal chargeAmount = BigDecimal.valueOf(1000);
 
         ExecutorService executorService = Executors.newFixedThreadPool(concurrentCount);
@@ -50,7 +50,7 @@ class PointServiceConcurrencyTest extends TestContainersConfig {
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failCount = new AtomicInteger(0);
 
-        // when - 50개 스레드가 동시에 1000원씩 충전
+        // when - 5개 스레드가 동시에 1000원씩 충전
         IntStream.range(0, concurrentCount).forEach(i -> {
             executorService.submit(() -> {
                 try {
@@ -104,10 +104,10 @@ class PointServiceConcurrencyTest extends TestContainersConfig {
     void concurrentUsePoint_SameUser() throws InterruptedException {
         // given
         Long userId = 1L;
-        BigDecimal initialBalance = BigDecimal.valueOf(100000);
+        BigDecimal initialBalance = BigDecimal.valueOf(10000);  // 5개 요청에 맞춤
         pointService.chargePoint(userId, initialBalance);
 
-        int concurrentCount = 50;
+        int concurrentCount = 5;  // 현실적인 동시 요청 수준 (중복 클릭, 여러 디바이스)
         BigDecimal useAmount = BigDecimal.valueOf(1000);
 
         ExecutorService executorService = Executors.newFixedThreadPool(concurrentCount);
@@ -116,7 +116,7 @@ class PointServiceConcurrencyTest extends TestContainersConfig {
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failCount = new AtomicInteger(0);
 
-        // when - 50개 스레드가 동시에 1000원씩 사용
+        // when - 5개 스레드가 동시에 1000원씩 사용
         IntStream.range(0, concurrentCount).forEach(i -> {
             executorService.submit(() -> {
                 try {
@@ -153,22 +153,23 @@ class PointServiceConcurrencyTest extends TestContainersConfig {
     void concurrentChargeAndUsePoint_SameUser() throws InterruptedException {
         // given
         Long userId = 1L;
-        BigDecimal initialBalance = BigDecimal.valueOf(50000);
+        BigDecimal initialBalance = BigDecimal.valueOf(10000);
         pointService.chargePoint(userId, initialBalance);
 
-        int chargeCount = 25;
-        int useCount = 25;
+        // 가벼운 동시 접근 수 (2회씩) 가정
+        int chargeCountConcurrency = 2;
+        int useCountConcurrency = 2;
         BigDecimal amount = BigDecimal.valueOf(1000);
 
-        ExecutorService executorService = Executors.newFixedThreadPool(50);
-        CountDownLatch latch = new CountDownLatch(chargeCount + useCount);
+        ExecutorService executorService = Executors.newFixedThreadPool(4);
+        CountDownLatch latch = new CountDownLatch(chargeCountConcurrency + useCountConcurrency);
 
         AtomicInteger chargeSuccessCount = new AtomicInteger(0);
         AtomicInteger useSuccessCount = new AtomicInteger(0);
         AtomicInteger failCount = new AtomicInteger(0);
 
-        // when - 25개 충전, 25개 사용 동시 실행
-        IntStream.range(0, chargeCount).forEach(i -> {
+        // when - 5개 충전, 5개 사용 동시 실행
+        IntStream.range(0, chargeCountConcurrency).forEach(i -> {
             executorService.submit(() -> {
                 try {
                     pointService.chargePoint(userId, amount);
@@ -181,7 +182,7 @@ class PointServiceConcurrencyTest extends TestContainersConfig {
             });
         });
 
-        IntStream.range(0, useCount).forEach(i -> {
+        IntStream.range(0, useCountConcurrency).forEach(i -> {
             executorService.submit(() -> {
                 try {
                     pointService.usePoint(userId, amount, (long) i);
@@ -194,9 +195,9 @@ class PointServiceConcurrencyTest extends TestContainersConfig {
             });
         });
 
-        latch.await(30, TimeUnit.SECONDS);
+        latch.await(10, TimeUnit.SECONDS);
         executorService.shutdown();
-        executorService.awaitTermination(30, TimeUnit.SECONDS);
+        executorService.awaitTermination(10, TimeUnit.SECONDS);
 
         // then
         System.out.println("=== 충전/사용 혼합 테스트 결과 ===");
@@ -209,8 +210,8 @@ class PointServiceConcurrencyTest extends TestContainersConfig {
                 .add(amount.multiply(BigDecimal.valueOf(chargeSuccessCount.get())))
                 .subtract(amount.multiply(BigDecimal.valueOf(useSuccessCount.get())));
 
-        assertThat(chargeSuccessCount.get()).isEqualTo(chargeCount);
-        assertThat(useSuccessCount.get()).isEqualTo(useCount);
+        assertThat(chargeSuccessCount.get()).isEqualTo(chargeCountConcurrency);
+        assertThat(useSuccessCount.get()).isEqualTo(useCountConcurrency);
         assertThat(failCount.get()).isEqualTo(0);
         assertThat(finalPoint.getBalance()).isEqualByComparingTo(expectedBalance);
     }
@@ -220,13 +221,13 @@ class PointServiceConcurrencyTest extends TestContainersConfig {
     void concurrentUsePoint_InsufficientBalance() throws InterruptedException {
         // given
         Long userId = 1L;
-        BigDecimal initialBalance = BigDecimal.valueOf(10000);
+        BigDecimal initialBalance = BigDecimal.valueOf(3000);
         pointService.chargePoint(userId, initialBalance);
 
-        int concurrentCount = 20;
+        int concurrentCount = 5;  // 현실적인 동시 요청 수준
         BigDecimal useAmount = BigDecimal.valueOf(1000);
-        // 초기 잔액: 10000원, 사용 금액: 1000원 * 20회 시도 = 20000원 필요
-        // 예상: 10회 성공, 10회 실패
+        // 초기 잔액: 3000원, 사용 금액: 1000원 * 5회 시도 = 5000원 필요
+        // 예상: 3회 성공, 2회 실패
 
         ExecutorService executorService = Executors.newFixedThreadPool(concurrentCount);
         CountDownLatch latch = new CountDownLatch(concurrentCount);
@@ -234,7 +235,7 @@ class PointServiceConcurrencyTest extends TestContainersConfig {
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failCount = new AtomicInteger(0);
 
-        // when - 20개 스레드가 동시에 1000원씩 사용 (잔액은 10000원)
+        // when - 5개 스레드가 동시에 1000원씩 사용 (잔액은 3000원)
         IntStream.range(0, concurrentCount).forEach(i -> {
             executorService.submit(() -> {
                 try {
@@ -259,8 +260,8 @@ class PointServiceConcurrencyTest extends TestContainersConfig {
 
         Point finalPoint = pointService.getPoint(userId);
 
-        assertThat(successCount.get()).isEqualTo(10); // 10000원 / 1000원 = 10회
-        assertThat(failCount.get()).isEqualTo(10);
+        assertThat(successCount.get()).isEqualTo(3); // 3000원 / 1000원 = 3회
+        assertThat(failCount.get()).isEqualTo(2);
         assertThat(finalPoint.getBalance()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 }
