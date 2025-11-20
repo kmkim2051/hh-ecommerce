@@ -24,7 +24,10 @@ import static org.assertj.core.api.Assertions.*;
 class CouponServiceConcurrencyTest extends TestContainersConfig {
 
     @Autowired
-    private CouponService couponService;
+    private CouponCommandService couponCommandService;
+
+    @Autowired
+    private CouponQueryService couponQueryService;
 
     @Autowired
     private CouponRepository couponRepository;
@@ -72,7 +75,7 @@ class CouponServiceConcurrencyTest extends TestContainersConfig {
             executorService.submit(() -> {
                 try {
                     Long userId = (long) (i + 1);
-                    couponService.issueCoupon(userId, couponId);
+                    couponCommandService.issueCoupon(userId, couponId);
                     successCount.incrementAndGet();
                     successUserIds.add(userId);
                 } catch (CouponException e) {
@@ -98,7 +101,7 @@ class CouponServiceConcurrencyTest extends TestContainersConfig {
         assertThat(successUserIds).hasSize(totalQuantity);
 
         // 쿠폰 수량 확인
-        Coupon updatedCoupon = couponService.getCoupon(couponId);
+        Coupon updatedCoupon = couponQueryService.getCoupon(couponId);
         assertThat(updatedCoupon.getAvailableQuantity()).isEqualTo(0);
     }
 
@@ -128,7 +131,7 @@ class CouponServiceConcurrencyTest extends TestContainersConfig {
         IntStream.range(0, concurrentAttempts).forEach(i -> {
             executorService.submit(() -> {
                 try {
-                    couponService.issueCoupon(userId, couponId);
+                    couponCommandService.issueCoupon(userId, couponId);
                     successCount.incrementAndGet();
                 } catch (CouponException e) {
                     failCount.incrementAndGet();
@@ -147,7 +150,7 @@ class CouponServiceConcurrencyTest extends TestContainersConfig {
         assertThat(failCount.get()).isEqualTo(concurrentAttempts - 1);
 
         // 해당 사용자의 쿠폰 발급 내역 확인
-        List<CouponUserWithCoupon> userCoupons = couponService.getMyCoupons(userId);
+        List<CouponUserWithCoupon> userCoupons = couponQueryService.getMyCoupons(userId);
         assertThat(userCoupons).hasSize(1);
     }
     @Test
@@ -176,7 +179,7 @@ class CouponServiceConcurrencyTest extends TestContainersConfig {
             executorService.submit(() -> {
                 try {
                     Long userId = (long) (i + 1);
-                    couponService.issueCoupon(userId, couponId);
+                    couponCommandService.issueCoupon(userId, couponId);
                     successCount.incrementAndGet();
                     successUserIds.add(userId);
                 } catch (CouponException e) {
@@ -196,7 +199,7 @@ class CouponServiceConcurrencyTest extends TestContainersConfig {
         assertThat(successUserIds).hasSize(1);
 
         // 쿠폰 수량 확인
-        Coupon finalCoupon = couponService.getCoupon(couponId);
+        Coupon finalCoupon = couponQueryService.getCoupon(couponId);
         assertThat(finalCoupon.getAvailableQuantity()).isEqualTo(0);
     }
 
@@ -216,7 +219,7 @@ class CouponServiceConcurrencyTest extends TestContainersConfig {
 
         // 순차적으로 10개 발급
         for (long i = 1; i <= 10; i++) {
-            couponService.issueCoupon(i, couponId);
+            couponCommandService.issueCoupon(i, couponId);
         }
 
         int queryThreads = 50;
@@ -229,7 +232,7 @@ class CouponServiceConcurrencyTest extends TestContainersConfig {
         IntStream.range(0, queryThreads).forEach(i -> {
             executorService.submit(() -> {
                 try {
-                    Coupon queriedCoupon = couponService.getCoupon(couponId);
+                    Coupon queriedCoupon = couponQueryService.getCoupon(couponId);
                     availableQuantities.add(queriedCoupon.getAvailableQuantity());
                 } finally {
                     latch.countDown();

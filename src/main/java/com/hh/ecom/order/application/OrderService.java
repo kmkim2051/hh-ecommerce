@@ -3,7 +3,8 @@ package com.hh.ecom.order.application;
 import com.hh.ecom.cart.application.CartService;
 import com.hh.ecom.cart.domain.CartItem;
 import com.hh.ecom.cart.domain.CartItemList;
-import com.hh.ecom.coupon.application.CouponService;
+import com.hh.ecom.coupon.application.CouponCommandService;
+import com.hh.ecom.coupon.application.CouponQueryService;
 import com.hh.ecom.coupon.domain.Coupon;
 import com.hh.ecom.coupon.domain.CouponUser;
 import com.hh.ecom.coupon.domain.CouponUserWithCoupon;
@@ -34,7 +35,8 @@ public class OrderService {
     private final OrderItemRepository orderItemRepository;
     private final CartService cartService;
     private final ProductService productService;
-    private final CouponService couponService;
+    private final CouponQueryService couponQueryService;
+    private final CouponCommandService couponCommandService;
     private final PointService pointService;
 
     @Transactional
@@ -144,7 +146,7 @@ public class OrderService {
             return DiscountInfo.NONE;
         }
 
-        Coupon coupon = couponService.getCoupon(couponId);
+        Coupon coupon = couponQueryService.getCoupon(couponId);
         if (coupon == null) {
             throw new OrderException(OrderErrorCode.COUPON_IN_ORDER_NOT_FOUND, "쿠폰을 찾을 수 없습니다. id=" + couponId);
         }
@@ -155,7 +157,7 @@ public class OrderService {
 
     private CouponUser findValidCouponUser(Long userId, Long couponId) {
         List<CouponUserWithCoupon> userCoupons =
-                Optional.ofNullable(couponService.getAllMyCoupons(userId))
+                Optional.ofNullable(couponQueryService.getAllMyCoupons(userId))
                         .orElse(Collections.emptyList());
 
         return userCoupons.stream()
@@ -170,7 +172,7 @@ public class OrderService {
 
     private void useCoupon(Long couponUserId, Order savedOrder) {
         if (couponUserId != null) {
-            couponService.useCoupon(couponUserId, savedOrder.getId());
+            couponCommandService.useCoupon(couponUserId, savedOrder.getId());
         }
     }
 

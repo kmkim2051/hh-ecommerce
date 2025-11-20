@@ -3,7 +3,8 @@ package com.hh.ecom.order.application;
 import com.hh.ecom.cart.application.CartService;
 import com.hh.ecom.cart.domain.CartItem;
 import com.hh.ecom.config.TestContainersConfig;
-import com.hh.ecom.coupon.application.CouponService;
+import com.hh.ecom.coupon.application.CouponCommandService;
+import com.hh.ecom.coupon.application.CouponQueryService;
 import com.hh.ecom.coupon.domain.Coupon;
 import com.hh.ecom.coupon.domain.CouponStatus;
 import com.hh.ecom.coupon.domain.CouponUser;
@@ -53,7 +54,10 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
     private ProductService productService;
 
     @MockitoBean
-    private CouponService couponService;
+    private CouponQueryService couponQueryService;
+
+    @MockitoBean
+    private CouponCommandService couponCommandService;
 
     @MockitoBean
     private PointService pointService;
@@ -118,14 +122,14 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
 
         when(cartService.getCartItemById(cartItemId)).thenReturn(cartItem);
         when(productService.getProductList(List.of(productId))).thenReturn(List.of(product));
-        when(couponService.getCoupon(couponId)).thenReturn(coupon);
-        when(couponService.getAllMyCoupons(userId)).thenReturn(
+        when(couponQueryService.getCoupon(couponId)).thenReturn(coupon);
+        when(couponQueryService.getAllMyCoupons(userId)).thenReturn(
                 List.of(CouponUserWithCoupon.of(couponUser, coupon))
         );
         when(pointService.hasPointAccount(userId)).thenReturn(true);
         when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(100000)));
         when(pointService.usePoint(anyLong(), any(BigDecimal.class), anyLong())).thenReturn(null);
-        when(couponService.useCoupon(anyLong(), anyLong())).thenReturn(null);
+        when(couponCommandService.useCoupon(anyLong(), anyLong())).thenReturn(null);
         doNothing().when(cartService).removeCartItems(anyLong(), anyList());
 
         CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), couponId);
@@ -139,7 +143,7 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         assertThat(createdOrder.getCouponUserId()).isEqualTo(couponUserId);
         assertThat(createdOrder.getStatus()).isEqualTo(OrderStatus.PAID);
 
-        verify(couponService).useCoupon(couponUserId, createdOrder.getId());
+        verify(couponCommandService).useCoupon(couponUserId, createdOrder.getId());
         verify(pointService).usePoint(userId, BigDecimal.valueOf(45000), createdOrder.getId());
     }
 
