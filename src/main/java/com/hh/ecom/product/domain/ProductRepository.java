@@ -10,6 +10,7 @@ public interface ProductRepository {
     Page<Product> findAll(Pageable pageable);
     Optional<Product> findById(Long id);
     List<Product> findByIdsIn(List<Long> ids);
+    List<Product> findByIdsInForUpdate(List<Long> ids);
     List<Product> findTopByViewCount(Integer limit);
 
     /**

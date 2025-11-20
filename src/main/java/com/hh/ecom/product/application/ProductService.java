@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -38,6 +39,13 @@ public class ProductService {
 
     public List<Product> getProductsBySalesCount(Integer limit) {
         return productRepository.findTopBySalesCount(limit);
+    }
+
+    @Transactional
+    public void decreaseProductStock(Long productId, Integer quantity) {
+        Product product = findProductById(productId);
+        Product decreased = product.decreaseStock(quantity);
+        productRepository.save(decreased);
     }
 
     private Product findProductById(Long id) {

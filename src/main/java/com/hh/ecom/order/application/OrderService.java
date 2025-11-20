@@ -50,9 +50,9 @@ public class OrderService {
 
         OrderPreparationResult preparationResult = cartService.prepareOrderFromCart(userId, cartItemIds);
 
-        List<CartItem> validatedCartItems = preparationResult.getValidatedCartItems();
-        BigDecimal totalAmount = preparationResult.getTotalAmount();
-        List<Long> productIds = preparationResult.getProductIds();
+        List<CartItem> validatedCartItems = preparationResult.validatedCartItems();
+        BigDecimal totalAmount = preparationResult.totalAmount();
+        List<Long> productIds = preparationResult.productIds();
 
         DiscountInfo discountInfo = calculateDiscountInfo(userId, couponId);
         BigDecimal discountAmount = discountInfo.discountAmount();
@@ -174,11 +174,11 @@ public class OrderService {
         pointService.usePoint(userId, finalAmount, savedOrder.getId());
     }
 
-    private static void decreaseProductStockInCart(List<CartItem> cartItems, Map<Long, Product> productMap) {
+    private void decreaseProductStockInCart(List<CartItem> cartItems, Map<Long, Product> productMap) {
         cartItems.forEach(cartItem -> {
             Product product = productMap.get(cartItem.getProductId());
             if (product != null) {
-                product.decreaseStock(cartItem.getQuantity());
+                productService.decreaseProductStock(product.getId(), cartItem.getQuantity());
             }
         });
     }

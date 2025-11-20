@@ -116,7 +116,7 @@ public class CartService {
                 .orElseThrow(() -> new ProductException(ProductErrorCode.PRODUCT_NOT_FOUND, "ID: " + productId));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public OrderPreparationResult prepareOrderFromCart(Long userId, List<Long> cartItemIds) {
         List<CartItem> cartItems = cartItemIds.stream()
                 .map(this::getCartItemById)
@@ -127,7 +127,7 @@ public class CartService {
         cartItemList.validateCartItemOwnership(userId);
 
         List<Long> productIds = cartItemList.getProductIdList();
-        List<Product> products = productRepository.findByIdsIn(productIds);
+        List<Product> products = productRepository.findByIdsInForUpdate(productIds);
 
         cartItemList.validateEnoughStock(products);
 
