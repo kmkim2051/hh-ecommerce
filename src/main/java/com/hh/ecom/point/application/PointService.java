@@ -25,6 +25,45 @@ public class PointService {
     private final PointTransactionRepository transactionRepository;
     private final OptimisticLockRetryExecutor retryExecutor;
 
+    public Point usePoint(Long userId, BigDecimal amount, Long orderId) {
+        return retryExecutor.execute(() -> {
+            Point point = findPointByUserId(userId);
+
+            Point usedPoint = point.use(amount);
+            Point savedPoint = pointRepository.save(usedPoint);
+
+            PointTransaction transaction = PointTransaction.create(
+                    savedPoint.getId(),
+                    amount,
+                    TransactionType.USE,
+                    orderId,
+                    savedPoint.getBalance()
+            );
+            transactionRepository.save(transaction);
+
+            return savedPoint;
+        });
+    }
+
+    public Point refundPoint(Long userId, BigDecimal amount, Long orderId) {
+        return retryExecutor.execute(() -> {
+            Point point = findPointByUserId(userId);
+
+            Point refundedPoint = point.refund(amount);
+            Point savedPoint = pointRepository.save(refundedPoint);
+
+            PointTransaction transaction = PointTransaction.create(
+                    savedPoint.getId(),
+                    amount,
+                    TransactionType.REFUND,
+                    orderId,
+                    savedPoint.getBalance()
+            );
+            transactionRepository.save(transaction);
+            return savedPoint;
+        });
+    }
+
     public Point chargePoint(Long userId, BigDecimal amount) {
         return retryExecutor.execute(() -> chargePointInternal(userId, amount), 5);
     }
@@ -99,45 +138,6 @@ public class PointService {
         Point point = findPointByUserId(userId);
 
         return transactionRepository.findByPointId(point.getId());
-    }
-
-    public Point usePoint(Long userId, BigDecimal amount, Long orderId) {
-        return retryExecutor.execute(() -> {
-            Point point = findPointByUserId(userId);
-
-            Point usedPoint = point.use(amount);
-            Point savedPoint = pointRepository.save(usedPoint);
-
-            PointTransaction transaction = PointTransaction.create(
-                    savedPoint.getId(),
-                    amount,
-                    TransactionType.USE,
-                    orderId,
-                    savedPoint.getBalance()
-            );
-            transactionRepository.save(transaction);
-
-            return savedPoint;
-        });
-    }
-
-    public Point refundPoint(Long userId, BigDecimal amount, Long orderId) {
-        return retryExecutor.execute(() -> {
-            Point point = findPointByUserId(userId);
-
-            Point refundedPoint = point.refund(amount);
-            Point savedPoint = pointRepository.save(refundedPoint);
-
-            PointTransaction transaction = PointTransaction.create(
-                    savedPoint.getId(),
-                    amount,
-                    TransactionType.REFUND,
-                    orderId,
-                    savedPoint.getBalance()
-            );
-            transactionRepository.save(transaction);
-            return savedPoint;
-        });
     }
 
     public boolean hasPointAccount(Long userId) {
