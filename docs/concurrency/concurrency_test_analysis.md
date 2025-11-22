@@ -70,7 +70,8 @@
 void concurrentCouponUsage_SameCoupon() {
     // 동일 쿠폰을 여러 요청이 동시에 사용 시도
     // 기대: 1개 요청만 성공, 나머지는 '이미 사용된 쿠폰' 예외
-}```
+}
+```
 
 **→ Step9에서 추가됨**: 쿠폰 사용 동시성 테스트 4개 추가
 - `concurrentCouponUsage_SameCoupon` - 동일 쿠폰 이중 사용 방지
