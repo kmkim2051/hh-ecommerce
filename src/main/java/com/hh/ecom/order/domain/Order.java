@@ -23,7 +23,7 @@ public class Order {
     private final BigDecimal discountAmount;   // 할인 금액
     private final BigDecimal finalAmount;      // 최종 결제 금액 (totalAmount - discountAmount)
     private final OrderStatus status;
-    private final Long couponUserId;           // 사용된 쿠폰 ID (nullable)
+    private final Long couponUserId;
     private final LocalDateTime createdAt;
     private final LocalDateTime updatedAt;
 

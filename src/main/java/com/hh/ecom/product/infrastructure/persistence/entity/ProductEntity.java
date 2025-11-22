@@ -53,9 +53,6 @@ public class ProductEntity {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    @Version
-    private Long version;
-
     public Product toDomain() {
         return Product.builder()
                 .id(this.id)

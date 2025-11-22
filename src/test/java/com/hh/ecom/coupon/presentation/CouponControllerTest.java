@@ -1,7 +1,8 @@
 package com.hh.ecom.coupon.presentation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hh.ecom.coupon.application.CouponService;
+import com.hh.ecom.coupon.application.CouponCommandService;
+import com.hh.ecom.coupon.application.CouponQueryService;
 import com.hh.ecom.coupon.domain.Coupon;
 import com.hh.ecom.coupon.domain.CouponStatus;
 import com.hh.ecom.coupon.domain.CouponUser;
@@ -12,8 +13,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -22,7 +21,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.hamcrest.Matchers.*;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -40,7 +38,10 @@ class CouponControllerTest {
     private ObjectMapper objectMapper;
 
     @MockitoBean
-    private CouponService couponService;
+    private CouponQueryService couponQueryService;
+
+    @MockitoBean
+    private CouponCommandService couponCommandService;
 
     @Test
     @DisplayName("GET /coupons - 발급 가능한 쿠폰 목록 조회 성공")
@@ -51,7 +52,7 @@ class CouponControllerTest {
                 createCoupon(2L, "VIP 할인 쿠폰", BigDecimal.valueOf(10000), 50, 30)
         );
 
-        given(couponService.getAvailableCoupons()).willReturn(coupons);
+        given(couponQueryService.getAvailableCoupons()).willReturn(coupons);
 
         // When & Then
         mockMvc.perform(get("/coupons"))
@@ -65,14 +66,14 @@ class CouponControllerTest {
                 .andExpect(jsonPath("$.coupons[1].id").value(2))
                 .andExpect(jsonPath("$.coupons[1].name").value("VIP 할인 쿠폰"));
 
-        verify(couponService, times(1)).getAvailableCoupons();
+        verify(couponQueryService, times(1)).getAvailableCoupons();
     }
 
     @Test
     @DisplayName("GET /coupons - 발급 가능한 쿠폰이 없는 경우")
     void getAvailableCoupons_Empty() throws Exception {
         // Given
-        given(couponService.getAvailableCoupons()).willReturn(List.of());
+        given(couponQueryService.getAvailableCoupons()).willReturn(List.of());
 
         // When & Then
         mockMvc.perform(get("/coupons"))
@@ -80,7 +81,7 @@ class CouponControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.coupons", hasSize(0)));
 
-        verify(couponService, times(1)).getAvailableCoupons();
+        verify(couponQueryService, times(1)).getAvailableCoupons();
     }
 
     @Test
@@ -94,8 +95,8 @@ class CouponControllerTest {
         Coupon coupon = createCoupon(couponId, "테스트 쿠폰", BigDecimal.valueOf(5000), 100, 99);
         CouponUser couponUser = createCouponUser(couponUserId, userId, couponId, false);
 
-        given(couponService.issueCoupon(userId, couponId)).willReturn(couponUser);
-        given(couponService.getCoupon(couponId)).willReturn(coupon);
+        given(couponCommandService.issueCoupon(userId, couponId)).willReturn(couponUser);
+        given(couponQueryService.getCoupon(couponId)).willReturn(coupon);
 
         // When & Then
         mockMvc.perform(post("/coupons/{couponId}/issue", couponId)
@@ -109,8 +110,8 @@ class CouponControllerTest {
                 .andExpect(jsonPath("$.discountAmount").value(5000))
                 .andExpect(jsonPath("$.message").value("쿠폰이 발급되었습니다."));
 
-        verify(couponService, times(1)).issueCoupon(userId, couponId);
-        verify(couponService, times(1)).getCoupon(couponId);
+        verify(couponCommandService, times(1)).issueCoupon(userId, couponId);
+        verify(couponQueryService, times(1)).getCoupon(couponId);
     }
 
     @Test
@@ -132,7 +133,7 @@ class CouponControllerTest {
         Long userId = 1L;
         Long couponId = 10L;
 
-        given(couponService.issueCoupon(userId, couponId))
+        given(couponCommandService.issueCoupon(userId, couponId))
                 .willThrow(new CouponException(CouponErrorCode.COUPON_ALREADY_ISSUED));
 
         // When & Then
@@ -141,7 +142,7 @@ class CouponControllerTest {
                 .andDo(print())
                 .andExpect(status().isConflict());
 
-        verify(couponService, times(1)).issueCoupon(userId, couponId);
+        verify(couponCommandService, times(1)).issueCoupon(userId, couponId);
     }
 
     @Test
@@ -151,7 +152,7 @@ class CouponControllerTest {
         Long userId = 1L;
         Long couponId = 10L;
 
-        given(couponService.issueCoupon(userId, couponId))
+        given(couponCommandService.issueCoupon(userId, couponId))
                 .willThrow(new CouponException(CouponErrorCode.COUPON_SOLD_OUT));
 
         // When & Then
@@ -160,7 +161,7 @@ class CouponControllerTest {
                 .andDo(print())
                 .andExpect(status().isBadRequest());
 
-        verify(couponService, times(1)).issueCoupon(userId, couponId);
+        verify(couponCommandService, times(1)).issueCoupon(userId, couponId);
     }
 
     @Test
@@ -170,7 +171,7 @@ class CouponControllerTest {
         Long userId = 1L;
         Long couponId = 99999L;
 
-        given(couponService.issueCoupon(userId, couponId))
+        given(couponCommandService.issueCoupon(userId, couponId))
                 .willThrow(new CouponException(CouponErrorCode.COUPON_NOT_FOUND));
 
         // When & Then
@@ -179,7 +180,7 @@ class CouponControllerTest {
                 .andDo(print())
                 .andExpect(status().isNotFound());
 
-        verify(couponService, times(1)).issueCoupon(userId, couponId);
+        verify(couponCommandService, times(1)).issueCoupon(userId, couponId);
     }
 
     @Test
@@ -199,7 +200,7 @@ class CouponControllerTest {
                 CouponUserWithCoupon.of(couponUser2, coupon2)
         );
 
-        given(couponService.getMyCoupons(userId)).willReturn(myCoupons);
+        given(couponQueryService.getMyCoupons(userId)).willReturn(myCoupons);
 
         // When & Then
         mockMvc.perform(get("/coupons/my")
@@ -214,7 +215,7 @@ class CouponControllerTest {
                 .andExpect(jsonPath("$.coupons[1].id").value(11))
                 .andExpect(jsonPath("$.coupons[1].couponName").value("쿠폰B"));
 
-        verify(couponService, times(1)).getMyCoupons(userId);
+        verify(couponQueryService, times(1)).getMyCoupons(userId);
     }
 
     @Test
@@ -222,7 +223,7 @@ class CouponControllerTest {
     void getMyCoupons_Empty() throws Exception {
         // Given
         Long userId = 1L;
-        given(couponService.getMyCoupons(userId)).willReturn(List.of());
+        given(couponQueryService.getMyCoupons(userId)).willReturn(List.of());
 
         // When & Then
         mockMvc.perform(get("/coupons/my")
@@ -231,7 +232,7 @@ class CouponControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.coupons", hasSize(0)));
 
-        verify(couponService, times(1)).getMyCoupons(userId);
+        verify(couponQueryService, times(1)).getMyCoupons(userId);
     }
 
 

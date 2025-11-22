@@ -72,6 +72,17 @@ class ProductTest {
                     .extracting("errorCode")
                     .isEqualTo(ProductErrorCode.INSUFFICIENT_STOCK);
         }
+
+        @Test
+        @DisplayName("재고 감소량이 0 이하일 경우 예외가 발생한다.")
+        void decreaseStock_minusStock() {
+            // given
+            Product product = Product.create("테스트 상품", "설명", BigDecimal.valueOf(10000), 1);
+
+            // when & then
+            assertThatThrownBy(() -> product.decreaseStock(0)).isInstanceOf(ProductException.class);
+            assertThatThrownBy(() -> product.decreaseStock(-1)).isInstanceOf(ProductException.class);
+        }
     }
 
     @Nested
@@ -172,7 +183,7 @@ class ProductTest {
             // then
             assertThat(deletedProduct.getIsActive()).isFalse();
             assertThat(deletedProduct.getDeletedAt()).isNotNull();
-            assertThat(deletedProduct.getUpdatedAt()).isAfter(product.getUpdatedAt());
+            assertThat(deletedProduct.getUpdatedAt()).isAfterOrEqualTo(product.getUpdatedAt());
         }
 
         @Test

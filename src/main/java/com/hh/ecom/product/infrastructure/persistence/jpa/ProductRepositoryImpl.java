@@ -47,6 +47,17 @@ public class ProductRepositoryImpl implements ProductRepository {
     }
 
     @Override
+    public List<Product> findByIdsInForUpdate(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+
+        return productJpaRepository.findByIdInForUpdate(ids).stream()
+                .map(ProductEntity::toDomain)
+                .toList();
+    }
+
+    @Override
     public List<Product> findTopByViewCount(Integer limit) {
         if (limit == null || limit <= 0) {
             return List.of();

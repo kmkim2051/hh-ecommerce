@@ -3,7 +3,7 @@ package com.hh.ecom.order.application;
 import com.hh.ecom.cart.application.CartService;
 import com.hh.ecom.cart.domain.CartItem;
 import com.hh.ecom.cart.domain.CartItemList;
-import com.hh.ecom.coupon.application.CouponService;
+import com.hh.ecom.coupon.application.CouponQueryService;
 import com.hh.ecom.order.application.dto.CreateOrderCommand;
 import com.hh.ecom.order.application.dto.DiscountInfo;
 import com.hh.ecom.order.domain.Order;
@@ -15,7 +15,6 @@ import com.hh.ecom.product.application.ProductService;
 import com.hh.ecom.product.domain.Product;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -28,7 +27,7 @@ public class OrderFactory {
     private final CartService cartService;
     private final ProductService productService;
     private final PointService pointService;
-    private final CouponService couponService;
+    private final CouponQueryService couponQueryService;
 
     public Order assembleOrder(Long userId, CreateOrderCommand createOrderCommand) {
         log.info("order 생성 시작합니다. (userId: {}, create command: {})", userId, createOrderCommand );
@@ -40,7 +39,7 @@ public class OrderFactory {
         cart.validateEnoughStock(products);
 
         final Long couponId = createOrderCommand.couponId();
-        DiscountInfo discountInfo = couponService.calculateDiscountInfo(userId, couponId);
+        DiscountInfo discountInfo = couponQueryService.calculateDiscountInfo(userId, couponId);
 
         BigDecimal discountAmount = discountInfo.discountAmount();
 

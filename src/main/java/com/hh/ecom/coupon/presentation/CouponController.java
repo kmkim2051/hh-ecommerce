@@ -1,6 +1,7 @@
 package com.hh.ecom.coupon.presentation;
 
-import com.hh.ecom.coupon.application.CouponService;
+import com.hh.ecom.coupon.application.CouponCommandService;
+import com.hh.ecom.coupon.application.CouponQueryService;
 import com.hh.ecom.coupon.domain.Coupon;
 import com.hh.ecom.coupon.domain.CouponUser;
 import com.hh.ecom.coupon.domain.CouponUserWithCoupon;
@@ -19,12 +20,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CouponController implements CouponApi {
 
-    private final CouponService couponService;
+    private final CouponQueryService couponQueryService;
+    private final CouponCommandService couponCommandService;
 
     @Override
     @GetMapping
     public ResponseEntity<CouponListResponse> getAvailableCoupons() {
-        List<Coupon> coupons = couponService.getAvailableCoupons();
+        List<Coupon> coupons = couponQueryService.getAvailableCoupons();
         CouponListResponse response = CouponListResponse.from(coupons);
         return ResponseEntity.ok(response);
     }
@@ -35,8 +37,8 @@ public class CouponController implements CouponApi {
             @RequestHeader("userId") Long userId,
             @PathVariable Long couponId
     ) {
-        CouponUser issuedCouponUser = couponService.issueCoupon(userId, couponId);
-        Coupon coupon = couponService.getCoupon(couponId);
+        CouponUser issuedCouponUser = couponCommandService.issueCoupon(userId, couponId);
+        Coupon coupon = couponQueryService.getCoupon(couponId);
 
         CouponIssueResponse response = CouponIssueResponse.from(
                 issuedCouponUser,
@@ -52,7 +54,7 @@ public class CouponController implements CouponApi {
     public ResponseEntity<MyCouponListResponse> getMyCoupons(
             @RequestHeader("userId") Long userId
     ) {
-        List<CouponUserWithCoupon> myCoupons = couponService.getMyCoupons(userId);
+        List<CouponUserWithCoupon> myCoupons = couponQueryService.getMyCoupons(userId);
         MyCouponListResponse response = MyCouponListResponse.from(myCoupons);
 
         return ResponseEntity.ok(response);

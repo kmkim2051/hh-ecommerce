@@ -18,6 +18,7 @@ public class Point {
     private final Long userId;
     private final BigDecimal balance;
     private final LocalDateTime updatedAt;
+    private final Long version;
 
     public static Point createWithUserId(Long userId) {
         return Point.builder()

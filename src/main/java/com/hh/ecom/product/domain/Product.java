@@ -55,6 +55,10 @@ public class Product {
     }
 
     public Product decreaseStock(int quantity) {
+        if (quantity <= 0) {
+            throw new ProductException(ProductErrorCode.INVALID_STOCK_QUANTITY);
+        }
+
         if (!hasEnoughStock(quantity)) {
             throw new ProductException(ProductErrorCode.INSUFFICIENT_STOCK,
                     "요청: " + quantity + ", 현재 재고: " + this.stockQuantity);
