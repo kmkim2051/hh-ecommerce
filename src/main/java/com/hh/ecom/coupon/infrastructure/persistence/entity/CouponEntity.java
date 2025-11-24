@@ -59,6 +59,9 @@ public class CouponEntity {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    @Version
+    private Long version;
+
     public Coupon toDomain() {
         return Coupon.builder()
                 .id(this.id)

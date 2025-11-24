@@ -49,6 +49,12 @@ public class ProductInMemoryRepository implements ProductRepository {
     }
 
     @Override
+    public List<Product> findByIdsInForUpdate(List<Long> ids) {
+        // InMemory 구현: 비관적 락이 없으므로 일반 조회와 동일하게 동작
+        return findByIdsIn(ids);
+    }
+
+    @Override
     public List<Product> findTopByViewCount(Integer limit) {
         if (limit == null || limit <= 0) {
             return List.of();

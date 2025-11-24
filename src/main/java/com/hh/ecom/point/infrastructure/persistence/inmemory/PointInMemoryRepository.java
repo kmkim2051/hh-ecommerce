@@ -72,12 +72,6 @@ public class PointInMemoryRepository implements PointRepository {
     }
 
     @Override
-    public Optional<Point> findByUserIdForUpdate(Long userId) {
-        // In-memory에서는 락이 필요없으므로 findByUserId와 동일
-        return findByUserId(userId);
-    }
-
-    @Override
     public void deleteAll() {
         points.clear();
         userIdToPointId.clear();

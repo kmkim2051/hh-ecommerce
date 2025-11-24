@@ -1,7 +1,8 @@
 package com.hh.ecom.coupon.presentation;
 
 import com.hh.ecom.config.TestContainersConfig;
-import com.hh.ecom.coupon.application.CouponService;
+import com.hh.ecom.coupon.application.CouponCommandService;
+import com.hh.ecom.coupon.application.CouponQueryService;
 import com.hh.ecom.coupon.domain.Coupon;
 import com.hh.ecom.coupon.domain.CouponRepository;
 import com.hh.ecom.coupon.domain.CouponUser;
@@ -27,7 +28,10 @@ import static org.assertj.core.api.Assertions.*;
 class CouponControllerIntegrationTest extends TestContainersConfig {
 
     @Autowired
-    private CouponService couponService;
+    private CouponQueryService couponQueryService;
+
+    @Autowired
+    private CouponCommandService couponCommandService;
 
     @Autowired
     private CouponRepository couponRepository;
@@ -41,7 +45,7 @@ class CouponControllerIntegrationTest extends TestContainersConfig {
 
     @BeforeEach
     void setUp() {
-        couponController = new CouponController(couponService);
+        couponController = new CouponController(couponQueryService, couponCommandService);
 
         couponUserRepository.deleteAll();
         couponRepository.deleteAll();
@@ -90,7 +94,7 @@ class CouponControllerIntegrationTest extends TestContainersConfig {
     @DisplayName("이미 발급받은 쿠폰을 다시 발급받으려고 하면 실패한다")
     void issueCoupon_AlreadyIssued() {
         // given
-        couponService.issueCoupon(testUserId, testCoupon.getId());
+        couponCommandService.issueCoupon(testUserId, testCoupon.getId());
 
         // when & then
         assertThatThrownBy(() -> couponController.issueCoupon(testUserId, testCoupon.getId()))
@@ -111,7 +115,7 @@ class CouponControllerIntegrationTest extends TestContainersConfig {
         final Coupon finalSoldOutCoupon = couponRepository.save(soldOutCoupon);
 
         // 첫 번째 사용자가 발급받음
-        couponService.issueCoupon(999L, finalSoldOutCoupon.getId());
+        couponCommandService.issueCoupon(999L, finalSoldOutCoupon.getId());
 
         // when & then - 두 번째 사용자가 발급 시도
         assertThatThrownBy(() -> couponController.issueCoupon(testUserId, finalSoldOutCoupon.getId()))
@@ -130,7 +134,7 @@ class CouponControllerIntegrationTest extends TestContainersConfig {
     @DisplayName("사용자가 보유한 미사용 쿠폰 목록을 조회한다")
     void getMyCoupons() {
         // given - 쿠폰 발급
-        couponService.issueCoupon(testUserId, testCoupon.getId());
+        couponCommandService.issueCoupon(testUserId, testCoupon.getId());
 
         // when
         ResponseEntity<MyCouponListResponse> response = couponController.getMyCoupons(testUserId);
@@ -147,7 +151,7 @@ class CouponControllerIntegrationTest extends TestContainersConfig {
     @DisplayName("사용된 쿠폰은 보유 쿠폰 목록에서 조회되지 않는다")
     void getMyCoupons_UsedCouponNotIncluded() {
         // given - 쿠폰 발급 후 사용
-        CouponUser issuedCouponUser = couponService.issueCoupon(testUserId, testCoupon.getId());
+        CouponUser issuedCouponUser = couponCommandService.issueCoupon(testUserId, testCoupon.getId());
         CouponUser usedCouponUser = issuedCouponUser.use(1L);
         couponUserRepository.save(usedCouponUser);
 

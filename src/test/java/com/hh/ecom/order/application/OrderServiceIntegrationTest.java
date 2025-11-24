@@ -1,9 +1,11 @@
 package com.hh.ecom.order.application;
 
 import com.hh.ecom.cart.application.CartService;
+import com.hh.ecom.cart.application.dto.OrderPreparationResult;
 import com.hh.ecom.cart.domain.CartItem;
 import com.hh.ecom.config.TestContainersConfig;
-import com.hh.ecom.coupon.application.CouponService;
+import com.hh.ecom.coupon.application.CouponCommandService;
+import com.hh.ecom.coupon.application.CouponQueryService;
 import com.hh.ecom.coupon.domain.Coupon;
 import com.hh.ecom.coupon.domain.CouponStatus;
 import com.hh.ecom.coupon.domain.CouponUser;
@@ -27,6 +29,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -53,7 +56,10 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
     private ProductService productService;
 
     @MockitoBean
-    private CouponService couponService;
+    private CouponQueryService couponQueryService;
+
+    @MockitoBean
+    private CouponCommandService couponCommandService;
 
     @MockitoBean
     private PointService pointService;
@@ -74,12 +80,20 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         CartItem cartItem = createCartItem(cartItemId, userId, productId, 2);
         Product product = createProduct(productId, "노트북", BigDecimal.valueOf(1500000), 10);
 
-        when(cartService.getCartItemById(cartItemId)).thenReturn(cartItem);
+        // CartService.prepareOrderFromCart 모킹
+        OrderPreparationResult preparationResult = OrderPreparationResult.of(
+                List.of(cartItem),
+                BigDecimal.valueOf(3000000),
+                List.of(productId),
+                Map.of(productId, 2)
+        );
+        when(cartService.prepareOrderFromCart(userId, List.of(cartItemId))).thenReturn(preparationResult);
+
         when(productService.getProductList(List.of(productId))).thenReturn(List.of(product));
         when(pointService.hasPointAccount(userId)).thenReturn(true);
         when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(5000000)));
         when(pointService.usePoint(anyLong(), any(BigDecimal.class), anyLong())).thenReturn(null);
-        doNothing().when(cartService).removeCartItems(anyLong(), anyList());
+        doNothing().when(cartService).completeOrderCheckout(anyLong(), anyList());
 
         CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), null);
 
@@ -116,17 +130,25 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         Coupon coupon = createCoupon(couponId, "할인쿠폰", BigDecimal.valueOf(5000));
         CouponUser couponUser = createCouponUser(couponUserId, userId, couponId, false);
 
-        when(cartService.getCartItemById(cartItemId)).thenReturn(cartItem);
+        // CartService.prepareOrderFromCart 모킹
+        OrderPreparationResult preparationResult = OrderPreparationResult.of(
+                List.of(cartItem),
+                BigDecimal.valueOf(50000),
+                List.of(productId),
+                Map.of(productId, 1)
+        );
+        when(cartService.prepareOrderFromCart(userId, List.of(cartItemId))).thenReturn(preparationResult);
+
         when(productService.getProductList(List.of(productId))).thenReturn(List.of(product));
-        when(couponService.getCoupon(couponId)).thenReturn(coupon);
-        when(couponService.getAllMyCoupons(userId)).thenReturn(
+        when(couponQueryService.getCoupon(couponId)).thenReturn(coupon);
+        when(couponQueryService.getAllMyCoupons(userId)).thenReturn(
                 List.of(CouponUserWithCoupon.of(couponUser, coupon))
         );
         when(pointService.hasPointAccount(userId)).thenReturn(true);
         when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(100000)));
         when(pointService.usePoint(anyLong(), any(BigDecimal.class), anyLong())).thenReturn(null);
-        when(couponService.useCoupon(anyLong(), anyLong())).thenReturn(null);
-        doNothing().when(cartService).removeCartItems(anyLong(), anyList());
+        when(couponCommandService.useCoupon(anyLong(), anyLong())).thenReturn(null);
+        doNothing().when(cartService).completeOrderCheckout(anyLong(), anyList());
 
         CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), couponId);
 
@@ -139,7 +161,7 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         assertThat(createdOrder.getCouponUserId()).isEqualTo(couponUserId);
         assertThat(createdOrder.getStatus()).isEqualTo(OrderStatus.PAID);
 
-        verify(couponService).useCoupon(couponUserId, createdOrder.getId());
+        verify(couponCommandService).useCoupon(couponUserId, createdOrder.getId());
         verify(pointService).usePoint(userId, BigDecimal.valueOf(45000), createdOrder.getId());
     }
 
@@ -238,7 +260,15 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         CartItem cartItem = createCartItem(cartItemId, userId, productId, 1);
         Product product = createProduct(productId, "고가상품", BigDecimal.valueOf(1000000), 10);
 
-        when(cartService.getCartItemById(cartItemId)).thenReturn(cartItem);
+        // CartService.prepareOrderFromCart 모킹
+        OrderPreparationResult preparationResult = OrderPreparationResult.of(
+                List.of(cartItem),
+                BigDecimal.valueOf(1000000),
+                List.of(productId),
+                Map.of(productId, 1)
+        );
+        when(cartService.prepareOrderFromCart(userId, List.of(cartItemId))).thenReturn(preparationResult);
+
         when(productService.getProductList(List.of(productId))).thenReturn(List.of(product));
         when(pointService.hasPointAccount(userId)).thenReturn(true);
         when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(50000)));
@@ -260,11 +290,9 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         Long cartItemId = 100L;
         Long productId = 1000L;
 
-        CartItem cartItem = createCartItem(cartItemId, userId, productId, 10);
-        Product product = createProduct(productId, "품절임박상품", BigDecimal.valueOf(10000), 5);
-
-        when(cartService.getCartItemById(cartItemId)).thenReturn(cartItem);
-        when(productService.getProductList(List.of(productId))).thenReturn(List.of(product));
+        // prepareOrderFromCart에서 재고 부족 예외 발생
+        when(cartService.prepareOrderFromCart(userId, List.of(cartItemId)))
+                .thenThrow(new OrderException(OrderErrorCode.INVALID_ORDER_STATUS, "재고가 부족합니다"));
         when(pointService.hasPointAccount(userId)).thenReturn(true);
 
         CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), null);
@@ -310,14 +338,21 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         Product product1 = createProduct(productId1, "노트북", BigDecimal.valueOf(1500000), 10);
         Product product2 = createProduct(productId2, "마우스", BigDecimal.valueOf(50000), 20);
 
-        when(cartService.getCartItemById(cartItemId1)).thenReturn(cartItem1);
-        when(cartService.getCartItemById(cartItemId2)).thenReturn(cartItem2);
+        // CartService.prepareOrderFromCart 모킹
+        OrderPreparationResult preparationResult = OrderPreparationResult.of(
+                List.of(cartItem1, cartItem2),
+                BigDecimal.valueOf(3050000),
+                List.of(productId1, productId2),
+                Map.of(productId1, 2, productId2, 1)
+        );
+        when(cartService.prepareOrderFromCart(userId, List.of(cartItemId1, cartItemId2))).thenReturn(preparationResult);
+
         when(productService.getProductList(List.of(productId1, productId2)))
                 .thenReturn(List.of(product1, product2));
         when(pointService.hasPointAccount(userId)).thenReturn(true);
         when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(5000000)));
         when(pointService.usePoint(anyLong(), any(BigDecimal.class), anyLong())).thenReturn(null);
-        doNothing().when(cartService).removeCartItems(anyLong(), anyList());
+        doNothing().when(cartService).completeOrderCheckout(anyLong(), anyList());
 
         CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId1, cartItemId2), null);
 
@@ -340,12 +375,20 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         CartItem cartItem = createCartItem(cartItemId, userId, productId, 1);
         Product product = createProduct(productId, productName, price, 100);
 
-        lenient().when(cartService.getCartItemById(cartItemId)).thenReturn(cartItem);
+        // CartService.prepareOrderFromCart 모킹
+        OrderPreparationResult preparationResult = OrderPreparationResult.of(
+                List.of(cartItem),
+                price,
+                List.of(productId),
+                Map.of(productId, 1)
+        );
+        lenient().when(cartService.prepareOrderFromCart(userId, List.of(cartItemId))).thenReturn(preparationResult);
+
         lenient().when(productService.getProductList(List.of(productId))).thenReturn(List.of(product));
         lenient().when(pointService.hasPointAccount(userId)).thenReturn(true);
         lenient().when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(10000000)));
         lenient().when(pointService.usePoint(anyLong(), any(BigDecimal.class), anyLong())).thenReturn(null);
-        lenient().doNothing().when(cartService).removeCartItems(anyLong(), anyList());
+        lenient().doNothing().when(cartService).completeOrderCheckout(anyLong(), anyList());
     }
 
     private CartItem createCartItem(Long id, Long userId, Long productId, Integer quantity) {

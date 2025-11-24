@@ -3,13 +3,10 @@ package com.hh.ecom.coupon.application;
 import com.hh.ecom.coupon.domain.*;
 import com.hh.ecom.coupon.domain.exception.CouponErrorCode;
 import com.hh.ecom.coupon.domain.exception.CouponException;
-
 import com.hh.ecom.order.application.dto.DiscountInfo;
 import com.hh.ecom.order.domain.exception.OrderErrorCode;
 import com.hh.ecom.order.domain.exception.OrderException;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,44 +15,29 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
-public class CouponService {
+public class CouponQueryService {
     private final CouponRepository couponRepository;
     private final CouponUserRepository couponUserRepository;
 
+    @Transactional(readOnly = true)
     public List<Coupon> getAvailableCoupons() {
         return couponRepository.findAllIssuable();
     }
 
+    @Transactional(readOnly = true)
     public List<Coupon> getAllCoupons() {
         return couponRepository.findAll();
     }
 
-    @Transactional
-    public CouponUser issueCoupon(Long userId, Long couponId) {
-        try {
-            return tryIssueCoupon(userId, couponId);
-        } catch (DataIntegrityViolationException e) {
-            log.debug("중복 발급 시도 감지. userId={}, couponId={}", userId, couponId);
-            throw new CouponException(CouponErrorCode.COUPON_ALREADY_ISSUED);
-        }
+    @Transactional(readOnly = true)
+    public Coupon getCoupon(Long couponId) {
+        return couponRepository.findById(couponId)
+                .orElseThrow(() -> new CouponException(CouponErrorCode.COUPON_NOT_FOUND, "couponId: " + couponId));
     }
 
-    private CouponUser tryIssueCoupon(Long userId, Long couponId) {
-        Coupon coupon = findByIdWithLock(couponId);
-
-        coupon.validateIssuable();
-        validateNotDuplicatedIssue(userId, couponId);
-
-        Coupon decreasedCoupon = coupon.decreaseQuantity();
-        couponRepository.save(decreasedCoupon);
-
-        CouponUser couponUser = CouponUser.issue(userId, couponId, coupon.getEndDate());
-        return couponUserRepository.save(couponUser);
-    }
-
+    @Transactional(readOnly = true)
     public List<CouponUserWithCoupon> getMyCoupons(Long userId) {
         List<CouponUser> couponUsers = couponUserRepository.findByUserIdAndIsUsed(userId, false);
 
@@ -67,6 +49,7 @@ public class CouponService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<CouponUserWithCoupon> getAllMyCoupons(Long userId) {
         List<CouponUser> couponUsers = couponUserRepository.findByUserId(userId);
 
@@ -76,20 +59,6 @@ public class CouponService {
                     return CouponUserWithCoupon.of(couponUser, coupon);
                 })
                 .toList();
-    }
-
-    @Transactional
-    public CouponUser useCoupon(Long couponUserId, Long orderId) {
-        CouponUser couponUser = couponUserRepository.findById(couponUserId)
-                .orElseThrow(() -> new CouponException(CouponErrorCode.COUPON_USER_NOT_FOUND));
-
-        CouponUser usedCouponUser = couponUser.use(orderId);
-        return couponUserRepository.save(usedCouponUser);
-    }
-
-    public Coupon getCoupon(Long couponId) {
-        return couponRepository.findById(couponId)
-                .orElseThrow(() -> new CouponException(CouponErrorCode.COUPON_NOT_FOUND, "couponId: " + couponId));
     }
 
     @Transactional(readOnly = true)
@@ -112,26 +81,13 @@ public class CouponService {
                 .filter(cwc -> cwc.isSameCouponId(couponId))
                 .map(CouponUserWithCoupon::getCouponUser)
                 .filter(Objects::nonNull)
-
                 .filter(CouponUser::isUsable)
                 .findFirst()
                 .orElseThrow(() -> new OrderException(OrderErrorCode.INVALID_ORDER_STATUS, "사용 가능한 쿠폰이 없습니다. id=" + couponId));
     }
 
-    private void validateNotDuplicatedIssue(Long userId, Long couponId) {
-        couponUserRepository.findByUserIdAndCouponId(userId, couponId)
-                .ifPresent(existing -> {
-                    throw new CouponException(CouponErrorCode.COUPON_ALREADY_ISSUED);
-                });
-    }
-
     private Coupon findByIdWithoutLock(Long couponId) {
         return couponRepository.findById(couponId)
                 .orElseThrow(() -> new CouponException(CouponErrorCode.COUPON_NOT_FOUND));
-    }
-
-    private Coupon findByIdWithLock(Long couponId) {
-        return couponRepository.findByIdForUpdate(couponId)
-                .orElseThrow(() -> new CouponException(CouponErrorCode.COUPON_NOT_FOUND, "couponId: " + couponId));
     }
 }
