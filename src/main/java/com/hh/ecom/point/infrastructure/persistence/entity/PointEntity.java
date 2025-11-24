@@ -48,7 +48,6 @@ public class PointEntity {
                 .userId(this.userId)
                 .balance(this.balance)
                 .updatedAt(this.updatedAt)
-                .version(this.version)
                 .build();
     }
 
@@ -57,12 +56,6 @@ public class PointEntity {
                 .id(point.getId())
                 .userId(point.getUserId())
                 .balance(point.getBalance())
-                .version(point.getVersion())
                 .build();
-    }
-
-    public void updateFrom(Point point) {
-        this.userId = point.getUserId();
-        this.balance = point.getBalance();
     }
 }

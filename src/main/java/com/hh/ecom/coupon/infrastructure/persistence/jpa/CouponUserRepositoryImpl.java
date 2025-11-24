@@ -2,6 +2,8 @@ package com.hh.ecom.coupon.infrastructure.persistence.jpa;
 
 import com.hh.ecom.coupon.domain.CouponUser;
 import com.hh.ecom.coupon.domain.CouponUserRepository;
+import com.hh.ecom.coupon.domain.exception.CouponErrorCode;
+import com.hh.ecom.coupon.domain.exception.CouponException;
 import com.hh.ecom.coupon.infrastructure.persistence.entity.CouponUserEntity;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Primary;
@@ -22,15 +24,12 @@ public class CouponUserRepositoryImpl implements CouponUserRepository {
         CouponUserEntity savedEntity;
 
         if (couponUser.getId() == null) {
-            // 새로운 엔티티 생성 (id와 version은 JPA가 자동 생성)
             CouponUserEntity entity = CouponUserEntity.from(couponUser);
             savedEntity = couponUserJpaRepository.save(entity);
         } else {
-            // 기존 엔티티 업데이트 - 기존 엔티티를 조회해서 version 유지
             CouponUserEntity existingEntity = couponUserJpaRepository.findById(couponUser.getId())
-                    .orElseThrow(() -> new IllegalArgumentException("CouponUser not found: " + couponUser.getId()));
+                    .orElseThrow(() -> new CouponException(CouponErrorCode.COUPON_USER_NOT_FOUND,  couponUser.getId()));
 
-            // 기존 version을 유지하면서 새로운 엔티티 생성
             CouponUserEntity updatedEntity = CouponUserEntity.builder()
                     .id(existingEntity.getId())
                     .userId(couponUser.getUserId())
@@ -40,7 +39,7 @@ public class CouponUserRepositoryImpl implements CouponUserRepository {
                     .usedAt(couponUser.getUsedAt())
                     .expireDate(couponUser.getExpireDate())
                     .isUsed(couponUser.isUsed())
-                    .version(existingEntity.getVersion())  // 기존 version 유지
+                    .version(existingEntity.getVersion())
                     .build();
 
             savedEntity = couponUserJpaRepository.save(updatedEntity);
