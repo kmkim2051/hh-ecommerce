@@ -16,28 +16,25 @@ import java.util.Objects;
 import java.util.Optional;
 
 @Service
+@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class CouponQueryService {
     private final CouponRepository couponRepository;
     private final CouponUserRepository couponUserRepository;
 
-    @Transactional(readOnly = true)
     public List<Coupon> getAvailableCoupons() {
         return couponRepository.findAllIssuable();
     }
 
-    @Transactional(readOnly = true)
     public List<Coupon> getAllCoupons() {
         return couponRepository.findAll();
     }
 
-    @Transactional(readOnly = true)
     public Coupon getCoupon(Long couponId) {
         return couponRepository.findById(couponId)
                 .orElseThrow(() -> new CouponException(CouponErrorCode.COUPON_NOT_FOUND, "couponId: " + couponId));
     }
 
-    @Transactional(readOnly = true)
     public List<CouponUserWithCoupon> getMyCoupons(Long userId) {
         List<CouponUser> couponUsers = couponUserRepository.findByUserIdAndIsUsed(userId, false);
 
@@ -49,7 +46,6 @@ public class CouponQueryService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
     public List<CouponUserWithCoupon> getAllMyCoupons(Long userId) {
         List<CouponUser> couponUsers = couponUserRepository.findByUserId(userId);
 
@@ -61,7 +57,6 @@ public class CouponQueryService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
     public DiscountInfo calculateDiscountInfo(Long userId, Long couponId) {
         if (couponId == null) {
             return DiscountInfo.NONE;

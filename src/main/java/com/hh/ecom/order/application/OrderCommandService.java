@@ -3,6 +3,8 @@ package com.hh.ecom.order.application;
 import com.hh.ecom.cart.application.CartService;
 import com.hh.ecom.cart.application.dto.OrderPreparationResult;
 import com.hh.ecom.cart.domain.CartItem;
+import com.hh.ecom.common.lock.LockKeyGenerator;
+import com.hh.ecom.common.lock.RedisLockExecutor;
 import com.hh.ecom.coupon.application.CouponCommandService;
 import com.hh.ecom.coupon.application.CouponQueryService;
 import com.hh.ecom.coupon.domain.Coupon;
@@ -17,10 +19,12 @@ import com.hh.ecom.point.application.PointService;
 import com.hh.ecom.point.domain.Point;
 import com.hh.ecom.product.application.ProductService;
 import com.hh.ecom.product.domain.Product;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -30,7 +34,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class OrderService {
+public class OrderCommandService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final CartService cartService;
@@ -38,15 +42,43 @@ public class OrderService {
     private final CouponQueryService couponQueryService;
     private final CouponCommandService couponCommandService;
     private final PointService pointService;
+    private final RedisLockExecutor redisLockExecutor;
+    private final LockKeyGenerator lockKeyGenerator;
+    private final TransactionTemplate transactionTemplate;
 
-    @Transactional
     public Order createOrder(Long userId, CreateOrderCommand createOrderCommand) {
         createOrderCommand.validate();
         validateOrderPaymentAbility(userId);
 
         List<Long> cartItemIds = createOrderCommand.cartItemIds();
-        final Long couponId = createOrderCommand.couponId();
-        log.info("order 생성 시작합니다. (userId: {}, create command: {})", userId, createOrderCommand);
+        log.info("주문 생성 시작합니다. (userId: {}, create command: {})", userId, createOrderCommand);
+
+        List<Long> productIds = extractProductIdsFromCart(cartItemIds);
+        Long couponUserId = extractCouponUserId(userId, createOrderCommand.couponId());
+
+        // 주문 내부 분산락 필요 도메인: [Product, Point, Coupon]
+        List<String> lockKeys = lockKeyGenerator.generateOrderLockKeys(userId, productIds, couponUserId);
+        log.debug("분산락 키 생성 완료: keys={}", lockKeys);
+
+        return redisLockExecutor.executeWithLock(lockKeys, () ->
+            transactionTemplate.execute(status ->
+                executeOrderCreation(userId, createOrderCommand, couponUserId)
+            )
+        );
+    }
+
+    @Transactional
+    public Order updateOrderStatus(Long orderId, OrderStatus newStatus) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
+
+        Order updatedOrder = order.updateStatus(newStatus);
+        return orderRepository.save(updatedOrder);
+    }
+
+    // ------------------------------ Private Methods ------------------------------
+    private Order executeOrderCreation(Long userId, CreateOrderCommand createOrderCommand, Long couponUserId) {
+        List<Long> cartItemIds = createOrderCommand.cartItemIds();
 
         OrderPreparationResult preparationResult = cartService.prepareOrderFromCart(userId, cartItemIds);
 
@@ -54,9 +86,10 @@ public class OrderService {
         BigDecimal totalAmount = preparationResult.totalAmount();
         List<Long> productIds = preparationResult.productIds();
 
-        DiscountInfo discountInfo = calculateDiscountInfo(userId, couponId);
+        DiscountInfo discountInfo = couponUserId != null
+            ? calculateDiscountInfo(userId, createOrderCommand.couponId())
+            : DiscountInfo.NONE;
         BigDecimal discountAmount = discountInfo.discountAmount();
-        Long couponUserId = discountInfo.couponUserId();
 
         final BigDecimal finalAmount = calculateValidFinalAmount(totalAmount, discountAmount);
 
@@ -87,7 +120,30 @@ public class OrderService {
 
         cartService.completeOrderCheckout(userId, productIds);
 
+        log.info("주문 생성 완료: orderId={}, orderNumber={}", updatedOrder.getId(), updatedOrder.getOrderNumber());
         return updatedOrder.setOrderItems(savedOrderItems);
+    }
+
+    private List<Long> extractProductIdsFromCart(List<Long> cartItemIds) {
+        return cartItemIds.stream()
+            .map(cartService::getCartItemById)
+            .map(CartItem::getProductId)
+            .distinct()
+            .toList();
+    }
+
+    private Long extractCouponUserId(Long userId, Long couponId) {
+        if (couponId == null) {
+            return null;
+        }
+
+        try {
+            DiscountInfo discountInfo = calculateDiscountInfo(userId, couponId);
+            return discountInfo.couponUserId();
+        } catch (Exception e) {
+            log.warn("쿠폰 정보 조회 실패, 쿠폰 없이 진행: userId={}, couponId={}", userId, couponId);
+            return null;
+        }
     }
 
     private static BigDecimal calculateValidFinalAmount(BigDecimal totalAmount, BigDecimal discountAmount) {
@@ -99,38 +155,6 @@ public class OrderService {
         return result;
     }
 
-    @Transactional
-    public Order updateOrderStatus(Long orderId, OrderStatus newStatus) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
-
-        Order updatedOrder = order.updateStatus(newStatus);
-        return orderRepository.save(updatedOrder);
-    }
-
-    public List<Order> getOrders(Long userId) {
-        return orderRepository.findByUserId(userId);
-    }
-
-    public Order getOrder(Long orderId, Long userId) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
-
-        order.validateOwner(userId);
-
-        List<OrderItem> orderItems = orderItemRepository.findByOrderId(orderId);
-        return order.setOrderItems(orderItems);
-    }
-
-    public Order getOrderById(Long orderId) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
-
-        List<OrderItem> orderItems = orderItemRepository.findByOrderId(orderId);
-        return order.setOrderItems(orderItems);
-    }
-
-    // ------------------------------ private method ------------------------------
     private String generateOrderNumber() {
         return "ORDER-" + System.currentTimeMillis();
     }
@@ -158,7 +182,6 @@ public class OrderService {
                 .filter(cwc -> cwc.isSameCouponId(couponId))
                 .map(CouponUserWithCoupon::getCouponUser)
                 .filter(Objects::nonNull)
-
                 .filter(CouponUser::isUsable)
                 .findFirst()
                 .orElseThrow(() -> new OrderException(OrderErrorCode.INVALID_ORDER_STATUS, "사용 가능한 쿠폰이 없습니다. id=" + couponId));
@@ -166,12 +189,12 @@ public class OrderService {
 
     private void useCoupon(Long couponUserId, Order savedOrder) {
         if (couponUserId != null) {
-            couponCommandService.useCoupon(couponUserId, savedOrder.getId());
+            couponCommandService.useCouponWithinTransaction(couponUserId, savedOrder.getId());
         }
     }
 
     private void usePoint(Long userId, BigDecimal finalAmount, Order savedOrder) {
-        pointService.usePoint(userId, finalAmount, savedOrder.getId());
+        pointService.usePointWithinTransaction(userId, finalAmount, savedOrder.getId());
     }
 
     private void decreaseProductStockInCart(List<CartItem> cartItems, Map<Long, Product> productMap) {
@@ -197,7 +220,7 @@ public class OrderService {
     private static void validateSufficientUserBalance(BigDecimal userBalance, BigDecimal finalAmount) {
         if (userBalance.compareTo(finalAmount) < 0) {
             throw new OrderException(OrderErrorCode.INVALID_ORDER_STATUS,
-                    String.format("포인트 잔액이 부족합니다. 필요: %s, 보유: %s", finalAmount, userBalance));
+                    "포인트 잔액이 부족합니다. 필요: %s, 보유: %s".formatted(finalAmount, userBalance));
         }
     }
 
@@ -207,4 +230,3 @@ public class OrderService {
         }
     }
 }
-
