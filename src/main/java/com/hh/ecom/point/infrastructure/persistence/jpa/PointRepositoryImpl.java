@@ -34,7 +34,6 @@ public class PointRepositoryImpl implements PointRepository {
                     .balance(point.getBalance())
                     .createdAt(existingEntity.getCreatedAt())
                     .updatedAt(point.getUpdatedAt())
-                    .version(existingEntity.getVersion())  // 기존 version 유지
                     .build();
 
             savedEntity = pointJpaRepository.save(updatedEntity);

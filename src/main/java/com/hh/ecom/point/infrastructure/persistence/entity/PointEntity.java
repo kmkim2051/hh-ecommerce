@@ -39,9 +39,6 @@ public class PointEntity {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @Version
-    private Long version;
-
     public Point toDomain() {
         return Point.builder()
                 .id(this.id)
