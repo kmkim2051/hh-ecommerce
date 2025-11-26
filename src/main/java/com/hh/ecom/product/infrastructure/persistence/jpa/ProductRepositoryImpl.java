@@ -75,7 +75,6 @@ public class ProductRepositoryImpl implements ProductRepository {
             return List.of();
         }
 
-        // 1. OrderItem에서 판매량 집계 (DB 레벨)
         List<ProductSalesCount> salesCounts = orderItemJpaRepository
                 .findTopProductsBySalesCount(limit).stream()
                 .map(projection -> ProductSalesCount.of(
@@ -88,16 +87,13 @@ public class ProductRepositoryImpl implements ProductRepository {
             return List.of();
         }
 
-        // 2. 상위 판매 상품 ID 추출
         List<Long> topProductIds = salesCounts.stream()
                 .map(ProductSalesCount::getProductId)
                 .toList();
 
-        // 3. 상품 정보 일괄 조회
         Map<Long, Product> productMap = findByIdsIn(topProductIds).stream()
                 .collect(Collectors.toMap(Product::getId, p -> p));
 
-        // 4. 판매량 순서 유지하여 반환
         return topProductIds.stream()
                 .map(productMap::get)
                 .filter(java.util.Objects::nonNull)
