@@ -173,6 +173,32 @@ class ProductServiceTest {
     }
 
     @Nested
+    @DisplayName("상품 조회 시 조회수 증가 테스트")
+    class GetProductWithViewCountIncrementTest {
+
+        @Test
+        @DisplayName("상품 조회 시 조회수가 증가한다")
+        void getProduct_incrementsViewCount() {
+            // given
+            Long productId = 1L;
+            Product product = testProduct.toBuilder().id(productId).viewCount(5).build();
+            Product increasedProduct = product.increaseViewCount();
+
+            given(productRepository.findById(productId)).willReturn(Optional.of(product));
+            given(productRepository.save(any(Product.class))).willReturn(increasedProduct);
+
+            // when
+            Product result = productService.getProduct(productId);
+
+            // then
+            assertThat(result.getViewCount()).isEqualTo(6);
+            verify(productRepository).findById(productId);
+            verify(productRepository).save(any(Product.class));
+            verify(productRepository).saveProductView(productId);
+        }
+    }
+
+    @Nested
     @DisplayName("조회수 기반 상품 목록 조회 테스트")
     class GetProductsByViewCountTest {
 
@@ -236,6 +262,216 @@ class ProductServiceTest {
             // then
             assertThat(result).hasSize(limit);
             verify(productRepository).findTopByViewCount(limit);
+        }
+    }
+
+    @Nested
+    @DisplayName("최근 n일간 조회수 기반 상품 목록 조회 테스트")
+    class GetProductsByViewCountInRecentDaysTest {
+
+        @Test
+        @DisplayName("최근 1일간 조회수가 높은 상품 목록을 조회한다")
+        void getProductsByViewCountInRecentDays_1day() {
+            // given
+            int days = 1;
+            int limit = 10;
+            List<Product> topProducts = List.of(
+                    Product.create("상품1", "설명1", BigDecimal.valueOf(1000), 10).toBuilder().id(1L).build(),
+                    Product.create("상품2", "설명2", BigDecimal.valueOf(2000), 20).toBuilder().id(2L).build()
+            );
+            given(productRepository.findTopByViewCountInRecentDays(days, limit)).willReturn(topProducts);
+
+            // when
+            List<Product> result = productService.getProductsByViewCountInRecentDays(days, limit);
+
+            // then
+            assertThat(result).hasSize(2);
+            assertThat(result).extracting("name").containsExactly("상품1", "상품2");
+            verify(productRepository).findTopByViewCountInRecentDays(days, limit);
+        }
+
+        @Test
+        @DisplayName("최근 3일간 조회수가 높은 상품 목록을 조회한다")
+        void getProductsByViewCountInRecentDays_3days() {
+            // given
+            int days = 3;
+            int limit = 10;
+            List<Product> topProducts = List.of(
+                    Product.create("상품3", "설명3", BigDecimal.valueOf(3000), 30).toBuilder().id(3L).build(),
+                    Product.create("상품4", "설명4", BigDecimal.valueOf(4000), 40).toBuilder().id(4L).build()
+            );
+            given(productRepository.findTopByViewCountInRecentDays(days, limit)).willReturn(topProducts);
+
+            // when
+            List<Product> result = productService.getProductsByViewCountInRecentDays(days, limit);
+
+            // then
+            assertThat(result).hasSize(2);
+            assertThat(result).extracting("name").containsExactly("상품3", "상품4");
+            verify(productRepository).findTopByViewCountInRecentDays(days, limit);
+        }
+
+        @Test
+        @DisplayName("최근 7일간 조회수가 높은 상품 목록을 조회한다")
+        void getProductsByViewCountInRecentDays_7days() {
+            // given
+            int days = 7;
+            int limit = 10;
+            List<Product> topProducts = List.of(
+                    Product.create("상품5", "설명5", BigDecimal.valueOf(5000), 50).toBuilder().id(5L).build(),
+                    Product.create("상품6", "설명6", BigDecimal.valueOf(6000), 60).toBuilder().id(6L).build(),
+                    Product.create("상품7", "설명7", BigDecimal.valueOf(7000), 70).toBuilder().id(7L).build()
+            );
+            given(productRepository.findTopByViewCountInRecentDays(days, limit)).willReturn(topProducts);
+
+            // when
+            List<Product> result = productService.getProductsByViewCountInRecentDays(days, limit);
+
+            // then
+            assertThat(result).hasSize(3);
+            assertThat(result).extracting("name").containsExactly("상품5", "상품6", "상품7");
+            verify(productRepository).findTopByViewCountInRecentDays(days, limit);
+        }
+
+        @Test
+        @DisplayName("최근 n일간 조회 시 빈 리스트를 반환할 수 있다")
+        void getProductsByViewCountInRecentDays_emptyList() {
+            // given
+            int days = 1;
+            int limit = 10;
+            given(productRepository.findTopByViewCountInRecentDays(days, limit)).willReturn(List.of());
+
+            // when
+            List<Product> result = productService.getProductsByViewCountInRecentDays(days, limit);
+
+            // then
+            assertThat(result).isEmpty();
+            verify(productRepository).findTopByViewCountInRecentDays(days, limit);
+        }
+
+        @Test
+        @DisplayName("limit 만큼만 상품을 조회한다")
+        void getProductsByViewCountInRecentDays_withLimit() {
+            // given
+            int days = 3;
+            int limit = 2;
+            List<Product> products = List.of(
+                    Product.create("상품1", "설명1", BigDecimal.valueOf(1000), 10).toBuilder().id(1L).build(),
+                    Product.create("상품2", "설명2", BigDecimal.valueOf(2000), 20).toBuilder().id(2L).build()
+            );
+            given(productRepository.findTopByViewCountInRecentDays(days, limit)).willReturn(products);
+
+            // when
+            List<Product> result = productService.getProductsByViewCountInRecentDays(days, limit);
+
+            // then
+            assertThat(result).hasSize(limit);
+            verify(productRepository).findTopByViewCountInRecentDays(days, limit);
+        }
+    }
+
+    @Nested
+    @DisplayName("최근 n일간 판매량 기반 상품 목록 조회 테스트")
+    class GetProductsBySalesCountInRecentDaysTest {
+
+        @Test
+        @DisplayName("최근 1일간 판매량이 높은 상품 목록을 조회한다")
+        void getProductsBySalesCountInRecentDays_1day() {
+            // given
+            int days = 1;
+            int limit = 10;
+            List<Product> topProducts = List.of(
+                    Product.create("상품1", "설명1", BigDecimal.valueOf(1000), 10).toBuilder().id(1L).build(),
+                    Product.create("상품2", "설명2", BigDecimal.valueOf(2000), 20).toBuilder().id(2L).build()
+            );
+            given(productRepository.findTopBySalesCountInRecentDays(days, limit)).willReturn(topProducts);
+
+            // when
+            List<Product> result = productService.getProductsBySalesCountInRecentDays(days, limit);
+
+            // then
+            assertThat(result).hasSize(2);
+            assertThat(result).extracting("name").containsExactly("상품1", "상품2");
+            verify(productRepository).findTopBySalesCountInRecentDays(days, limit);
+        }
+
+        @Test
+        @DisplayName("최근 3일간 판매량이 높은 상품 목록을 조회한다")
+        void getProductsBySalesCountInRecentDays_3days() {
+            // given
+            int days = 3;
+            int limit = 10;
+            List<Product> topProducts = List.of(
+                    Product.create("상품3", "설명3", BigDecimal.valueOf(3000), 30).toBuilder().id(3L).build(),
+                    Product.create("상품4", "설명4", BigDecimal.valueOf(4000), 40).toBuilder().id(4L).build()
+            );
+            given(productRepository.findTopBySalesCountInRecentDays(days, limit)).willReturn(topProducts);
+
+            // when
+            List<Product> result = productService.getProductsBySalesCountInRecentDays(days, limit);
+
+            // then
+            assertThat(result).hasSize(2);
+            assertThat(result).extracting("name").containsExactly("상품3", "상품4");
+            verify(productRepository).findTopBySalesCountInRecentDays(days, limit);
+        }
+
+        @Test
+        @DisplayName("최근 7일간 판매량이 높은 상품 목록을 조회한다")
+        void getProductsBySalesCountInRecentDays_7days() {
+            // given
+            int days = 7;
+            int limit = 10;
+            List<Product> topProducts = List.of(
+                    Product.create("상품5", "설명5", BigDecimal.valueOf(5000), 50).toBuilder().id(5L).build(),
+                    Product.create("상품6", "설명6", BigDecimal.valueOf(6000), 60).toBuilder().id(6L).build(),
+                    Product.create("상품7", "설명7", BigDecimal.valueOf(7000), 70).toBuilder().id(7L).build()
+            );
+            given(productRepository.findTopBySalesCountInRecentDays(days, limit)).willReturn(topProducts);
+
+            // when
+            List<Product> result = productService.getProductsBySalesCountInRecentDays(days, limit);
+
+            // then
+            assertThat(result).hasSize(3);
+            assertThat(result).extracting("name").containsExactly("상품5", "상품6", "상품7");
+            verify(productRepository).findTopBySalesCountInRecentDays(days, limit);
+        }
+
+        @Test
+        @DisplayName("최근 n일간 판매 기록이 없으면 빈 리스트를 반환한다")
+        void getProductsBySalesCountInRecentDays_emptyList() {
+            // given
+            int days = 1;
+            int limit = 10;
+            given(productRepository.findTopBySalesCountInRecentDays(days, limit)).willReturn(List.of());
+
+            // when
+            List<Product> result = productService.getProductsBySalesCountInRecentDays(days, limit);
+
+            // then
+            assertThat(result).isEmpty();
+            verify(productRepository).findTopBySalesCountInRecentDays(days, limit);
+        }
+
+        @Test
+        @DisplayName("limit 만큼만 상품을 조회한다")
+        void getProductsBySalesCountInRecentDays_withLimit() {
+            // given
+            int days = 3;
+            int limit = 2;
+            List<Product> products = List.of(
+                    Product.create("상품1", "설명1", BigDecimal.valueOf(1000), 10).toBuilder().id(1L).build(),
+                    Product.create("상품2", "설명2", BigDecimal.valueOf(2000), 20).toBuilder().id(2L).build()
+            );
+            given(productRepository.findTopBySalesCountInRecentDays(days, limit)).willReturn(products);
+
+            // when
+            List<Product> result = productService.getProductsBySalesCountInRecentDays(days, limit);
+
+            // then
+            assertThat(result).hasSize(limit);
+            verify(productRepository).findTopBySalesCountInRecentDays(days, limit);
         }
     }
 

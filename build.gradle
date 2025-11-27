@@ -35,6 +35,7 @@ jacocoTestReport {
 }
 
 test {
+    useJUnitPlatform()
     finalizedBy jacocoTestReport
 }
 

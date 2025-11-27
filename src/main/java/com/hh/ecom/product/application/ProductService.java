@@ -21,8 +21,13 @@ public class ProductService {
         return productRepository.findAll(pageable);
     }
 
+    @Transactional
     public Product getProduct(Long id) {
-        return findProductById(id);
+        Product product = findProductById(id);
+        Product increasedProduct = product.increaseViewCount();
+        productRepository.save(increasedProduct);
+        productRepository.saveProductView(id);
+        return increasedProduct;
     }
 
     public List<Product> getProductList(List<Long> ids) {
@@ -37,8 +42,16 @@ public class ProductService {
         return productRepository.findTopByViewCount(limit);
     }
 
+    public List<Product> getProductsByViewCountInRecentDays(Integer days, Integer limit) {
+        return productRepository.findTopByViewCountInRecentDays(days, limit);
+    }
+
     public List<Product> getProductsBySalesCount(Integer limit) {
         return productRepository.findTopBySalesCount(limit);
+    }
+
+    public List<Product> getProductsBySalesCountInRecentDays(Integer days, Integer limit) {
+        return productRepository.findTopBySalesCountInRecentDays(days, limit);
     }
 
     @Transactional

@@ -82,6 +82,24 @@ public interface ProductApi {
     );
 
     @Operation(
+            summary = "최근 n일간 조회수 기반 상품 순위 조회",
+            description = "최근 n일간 조회수가 높은 순으로 상품 순위를 조회합니다."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = ProductListResponse.class))
+            )
+    })
+    ResponseEntity<ProductListResponse> getProductsByViewCountInRecentDays(
+            @Parameter(description = "조회 기준 일수 (1, 3, 7일 등)", required = true)
+            Integer days,
+            @Parameter(description = "조회할 상품 개수", required = false)
+            Integer limit
+    );
+
+    @Operation(
             summary = "판매량 기반 상품 순위 조회",
             description = "판매량이 높은 순으로 상품 순위를 조회합니다."
     )
@@ -93,6 +111,24 @@ public interface ProductApi {
             )
     })
     ResponseEntity<ProductListResponse> getProductsBySalesCount(
+            @Parameter(description = "조회할 상품 개수", required = false)
+            Integer limit
+    );
+
+    @Operation(
+            summary = "최근 n일간 판매량 기반 상품 순위 조회",
+            description = "최근 n일간 판매량이 높은 순으로 상품 순위를 조회합니다. COMPLETED 상태의 주문만 집계됩니다."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = ProductListResponse.class))
+            )
+    })
+    ResponseEntity<ProductListResponse> getProductsBySalesCountInRecentDays(
+            @Parameter(description = "조회 기준 일수 (1, 3, 7일 등)", required = true)
+            Integer days,
             @Parameter(description = "조회할 상품 개수", required = false)
             Integer limit
     );
