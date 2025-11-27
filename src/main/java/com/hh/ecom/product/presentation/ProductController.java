@@ -55,10 +55,28 @@ public class ProductController implements ProductApi {
     }
 
     @Override
+    @GetMapping("/ranking/views/recent")
+    public ResponseEntity<ProductListResponse> getProductsByViewCountInRecentDays(
+            @RequestParam(required = true) Integer days,
+            @RequestParam(required = false, defaultValue = "10") Integer limit) {
+        List<Product> products = productService.getProductsByViewCountInRecentDays(days, limit);
+        return ResponseEntity.ok(ProductListResponse.from(products));
+    }
+
+    @Override
     @GetMapping("/ranking/sales")
     public ResponseEntity<ProductListResponse> getProductsBySalesCount(
             @RequestParam(required = false, defaultValue = "10") Integer limit) {
         List<Product> products = productService.getProductsBySalesCount(limit);
+        return ResponseEntity.ok(ProductListResponse.from(products));
+    }
+
+    @Override
+    @GetMapping("/ranking/sales/recent")
+    public ResponseEntity<ProductListResponse> getProductsBySalesCountInRecentDays(
+            @RequestParam(required = true) Integer days,
+            @RequestParam(required = false, defaultValue = "10") Integer limit) {
+        List<Product> products = productService.getProductsBySalesCountInRecentDays(days, limit);
         return ResponseEntity.ok(ProductListResponse.from(products));
     }
 }

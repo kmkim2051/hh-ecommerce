@@ -78,11 +78,9 @@ public class CartService {
 
     @Transactional
     public void removeCartItem(Long cartItemId, Long userId) {
-        // 1. 장바구니 아이템 조회
         CartItem cartItem = cartItemRepository.findById(cartItemId)
                 .orElseThrow(() -> new CartException(CartErrorCode.CART_ITEM_NOT_FOUND, "ID: " + cartItemId));
 
-        // 2. 권한 확인
         if (!cartItem.belongsToUser(userId)) {
             throw new CartException(CartErrorCode.UNAUTHORIZED_CART_ACCESS,
                     "User ID: " + userId + ", Cart Item User ID: " + cartItem.getUserId());
@@ -127,7 +125,7 @@ public class CartService {
         cartItemList.validateCartItemOwnership(userId);
 
         List<Long> productIds = cartItemList.getProductIdList();
-        List<Product> products = productRepository.findByIdsInForUpdate(productIds);
+        List<Product> products = productRepository.findByIdsIn(productIds);
 
         cartItemList.validateEnoughStock(products);
 

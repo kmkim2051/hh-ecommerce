@@ -45,7 +45,7 @@ class PointControllerTest {
     void getPointBalance_Success() throws Exception {
         // Given
         Long userId = 1L;
-        Point point = createPoint(1L, userId, BigDecimal.valueOf(50000), 3L);
+        Point point = createPoint(1L, userId, BigDecimal.valueOf(50000));
 
         given(pointService.getPoint(userId)).willReturn(point);
 
@@ -84,7 +84,7 @@ class PointControllerTest {
         // Given
         Long userId = 1L;
         ChargePointRequest request = new ChargePointRequest(10000);
-        Point chargedPoint = createPoint(1L, userId, BigDecimal.valueOf(60000), 4L);
+        Point chargedPoint = createPoint(1L, userId, BigDecimal.valueOf(60000));
 
         given(pointService.chargePoint(userId, BigDecimal.valueOf(10000))).willReturn(chargedPoint);
 
@@ -215,7 +215,7 @@ class PointControllerTest {
     }
 
     // Helper methods
-    private Point createPoint(Long id, Long userId, BigDecimal balance, Long version) {
+    private Point createPoint(Long id, Long userId, BigDecimal balance) {
         return Point.builder()
                 .id(id)
                 .userId(userId)

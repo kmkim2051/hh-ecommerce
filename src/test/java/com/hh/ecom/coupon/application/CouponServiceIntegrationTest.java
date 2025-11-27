@@ -147,53 +147,6 @@ class CouponServiceIntegrationTest extends TestContainersConfig {
     }
 
     @Test
-    @DisplayName("통합 테스트 - 쿠폰 사용 처리")
-    void integration_UseCoupon() {
-        // Given
-        Coupon coupon = createAndSaveCoupon("사용 테스트 쿠폰", BigDecimal.valueOf(7000), 50);
-        Long userId = 1L;
-        Long orderId = 100L;
-
-        CouponUser issuedCoupon = couponCommandService.issueCoupon(userId, coupon.getId());
-
-        // When
-        CouponUser usedCoupon = couponCommandService.useCoupon(issuedCoupon.getId(), orderId);
-
-        // Then
-        assertThat(usedCoupon.isUsed()).isTrue();
-        assertThat(usedCoupon.getOrderId()).isEqualTo(orderId);
-        assertThat(usedCoupon.getUsedAt()).isNotNull();
-
-        // 미사용 쿠폰 조회 시 제외됨
-        List<CouponUserWithCoupon> unusedCoupons = couponQueryService.getMyCoupons(userId);
-        assertThat(unusedCoupons).isEmpty();
-
-        // 전체 쿠폰 조회 시 포함됨
-        List<CouponUserWithCoupon> allCoupons = couponQueryService.getAllMyCoupons(userId);
-        assertThat(allCoupons).hasSize(1);
-        assertThat(allCoupons.get(0).getCouponUser().isUsed()).isTrue();
-    }
-
-    @Test
-    @DisplayName("통합 테스트 - 사용된 쿠폰 재사용 불가")
-    void integration_CannotReuseUsedCoupon() {
-        // Given
-        Coupon coupon = createAndSaveCoupon("일회용 쿠폰", BigDecimal.valueOf(5000), 50);
-        Long userId = 1L;
-        Long orderId1 = 100L;
-        Long orderId2 = 200L;
-
-        CouponUser issuedCoupon = couponCommandService.issueCoupon(userId, coupon.getId());
-        couponCommandService.useCoupon(issuedCoupon.getId(), orderId1);
-
-        // When & Then - 이미 사용된 쿠폰 재사용 시도
-        assertThatThrownBy(() -> couponCommandService.useCoupon(issuedCoupon.getId(), orderId2))
-                .isInstanceOf(CouponException.class)
-                .extracting(ex -> ((CouponException) ex).getErrorCode())
-                .isEqualTo(CouponErrorCode.COUPON_ALREADY_USED);
-    }
-
-    @Test
     @DisplayName("통합 테스트 - 만료된 쿠폰 발급 불가")
     void integration_CannotIssueExpiredCoupon() {
         // Given - 어제 종료된 쿠폰
@@ -264,20 +217,6 @@ class CouponServiceIntegrationTest extends TestContainersConfig {
     }
 
     @Test
-    @DisplayName("통합 테스트 - 존재하지 않는 발급 쿠폰 사용 시도")
-    void integration_UseNonexistentCouponUser() {
-        // Given
-        Long nonexistentCouponUserId = 99999L;
-        Long orderId = 100L;
-
-        // When & Then
-        assertThatThrownBy(() -> couponCommandService.useCoupon(nonexistentCouponUserId, orderId))
-                .isInstanceOf(CouponException.class)
-                .extracting(ex -> ((CouponException) ex).getErrorCode())
-                .isEqualTo(CouponErrorCode.COUPON_USER_NOT_FOUND);
-    }
-
-    @Test
     @DisplayName("통합 테스트 - 모든 쿠폰 목록 조회")
     void integration_GetAllCoupons() {
         // Given
@@ -309,18 +248,14 @@ class CouponServiceIntegrationTest extends TestContainersConfig {
         CouponUser user2Coupon = couponCommandService.issueCoupon(user2, coupon.getId());
         CouponUser user3Coupon = couponCommandService.issueCoupon(user3, coupon.getId());
 
-        // user1이 쿠폰 사용
-        couponCommandService.useCoupon(user1Coupon.getId(), 100L);
-
         // Then
         // 쿠폰 수량 확인
         Coupon updatedCoupon = couponQueryService.getCoupon(coupon.getId());
         assertThat(updatedCoupon.getAvailableQuantity()).isEqualTo(2);
 
-        // user1 - 미사용 쿠폰 0개 (사용함)
-        assertThat(couponQueryService.getMyCoupons(user1)).isEmpty();
-        assertThat(couponQueryService.getAllMyCoupons(user1)).hasSize(1);
-        assertThat(couponQueryService.getAllMyCoupons(user1).get(0).getCouponUser().isUsed()).isTrue();
+        // user1 - 미사용 쿠폰 1개
+        assertThat(couponQueryService.getMyCoupons(user1)).hasSize(1);
+        assertThat(couponQueryService.getMyCoupons(user1).get(0).getCouponUser().isUsed()).isFalse();
 
         // user2 - 미사용 쿠폰 1개
         assertThat(couponQueryService.getMyCoupons(user2)).hasSize(1);

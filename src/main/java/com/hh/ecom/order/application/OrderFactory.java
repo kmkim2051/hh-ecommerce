@@ -100,7 +100,7 @@ public class OrderFactory {
     private static void validateEnoughUserBalance(BigDecimal userBalance, BigDecimal finalAmount) {
         if (userBalance.compareTo(finalAmount) < 0) {
             throw new OrderException(OrderErrorCode.INVALID_ORDER_STATUS,
-                    String.format("포인트 잔액이 부족합니다. 필요: %s, 보유: %s", finalAmount, userBalance));
+                    "포인트 잔액이 부족합니다. 필요: %s, 보유: %s".formatted(finalAmount, userBalance));
         }
     }
 

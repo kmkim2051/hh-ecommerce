@@ -1,6 +1,8 @@
 package com.hh.ecom.order.application;
 
 import com.hh.ecom.cart.application.CartService;
+import com.hh.ecom.common.lock.LockKeyGenerator;
+import com.hh.ecom.common.lock.RedisLockExecutor;
 import com.hh.ecom.coupon.application.CouponCommandService;
 import com.hh.ecom.coupon.application.CouponQueryService;
 import com.hh.ecom.order.application.dto.CreateOrderCommand;
@@ -16,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -27,31 +30,31 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
-
     @Mock
     private OrderRepository orderRepository;
-
     @Mock
     private OrderItemRepository orderItemRepository;
-
     @Mock
     private CartService cartService;
-
     @Mock
     private ProductService productService;
-
     @Mock
     private CouponQueryService couponQueryService;
-
     @Mock
     private CouponCommandService couponCommandService;
-
-
     @Mock
     private PointService pointService;
+    @Mock
+    private RedisLockExecutor redisLockExecutor;
+    @Mock
+    private LockKeyGenerator lockKeyGenerator;
+    @Mock
+    private TransactionTemplate transactionTemplate;
 
     @InjectMocks
-    private OrderService orderService;
+    private OrderCommandService orderCommandService;
+    @InjectMocks
+    private OrderQueryService orderQueryService;
 
     private Order testOrder;
     private OrderItem testOrderItem;
@@ -83,7 +86,7 @@ class OrderServiceTest {
         CreateOrderCommand command = new CreateOrderCommand(emptyCartItemIds, null);
 
         assertThatThrownBy(() ->
-                orderService.createOrder(userId, command))
+                orderCommandService.createOrder(userId, command))
                 .isInstanceOf(OrderException.class)
                 .extracting(ex -> ((OrderException) ex).getErrorCode())
                 .isEqualTo(OrderErrorCode.EMPTY_ORDER_CART_ITEM);
@@ -100,7 +103,7 @@ class OrderServiceTest {
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(testOrder));
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Order result = orderService.updateOrderStatus(orderId, newStatus);
+        Order result = orderCommandService.updateOrderStatus(orderId, newStatus);
 
         assertThat(result.getStatus()).isEqualTo(newStatus);
         verify(orderRepository).findById(orderId);
@@ -116,7 +119,7 @@ class OrderServiceTest {
         when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
-                orderService.updateOrderStatus(orderId, newStatus))
+                orderCommandService.updateOrderStatus(orderId, newStatus))
                 .isInstanceOf(OrderException.class)
                 .extracting(ex -> ((OrderException) ex).getErrorCode())
                 .isEqualTo(OrderErrorCode.ORDER_NOT_FOUND);
@@ -133,7 +136,7 @@ class OrderServiceTest {
 
         when(orderRepository.findByUserId(userId)).thenReturn(orders);
 
-        List<Order> result = orderService.getOrders(userId);
+        List<Order> result = orderQueryService.getOrders(userId);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getId()).isEqualTo(testOrder.getId());
@@ -150,7 +153,7 @@ class OrderServiceTest {
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(testOrder));
         when(orderItemRepository.findByOrderId(orderId)).thenReturn(orderItems);
 
-        Order result = orderService.getOrder(orderId, userId);
+        Order result = orderQueryService.getOrder(orderId, userId);
 
         assertThat(result).isNotNull();
         assertThat(result.getId()).isEqualTo(orderId);
@@ -168,7 +171,7 @@ class OrderServiceTest {
         when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
-                orderService.getOrder(orderId, userId))
+                orderQueryService.getOrder(orderId, userId))
                 .isInstanceOf(OrderException.class)
                 .extracting(ex -> ((OrderException) ex).getErrorCode())
                 .isEqualTo(OrderErrorCode.ORDER_NOT_FOUND);
@@ -187,7 +190,7 @@ class OrderServiceTest {
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(testOrder));
 
         assertThatThrownBy(() ->
-                orderService.getOrder(orderId, otherUserId))
+                orderQueryService.getOrder(orderId, otherUserId))
                 .isInstanceOf(OrderException.class)
                 .extracting(ex -> ((OrderException) ex).getErrorCode())
                 .isEqualTo(OrderErrorCode.UNAUTHORIZED_ORDER_ACCESS);
@@ -205,7 +208,7 @@ class OrderServiceTest {
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(testOrder));
         when(orderItemRepository.findByOrderId(orderId)).thenReturn(orderItems);
 
-        Order result = orderService.getOrderById(orderId);
+        Order result = orderQueryService.getOrderById(orderId);
 
         assertThat(result).isNotNull();
         assertThat(result.getId()).isEqualTo(orderId);

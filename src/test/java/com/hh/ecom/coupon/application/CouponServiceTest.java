@@ -1,5 +1,7 @@
 package com.hh.ecom.coupon.application;
 
+import com.hh.ecom.common.lock.LockKeyGenerator;
+import com.hh.ecom.common.lock.RedisLockExecutor;
 import com.hh.ecom.common.transaction.OptimisticLockRetryExecutor;
 import com.hh.ecom.coupon.domain.*;
 import com.hh.ecom.coupon.domain.exception.CouponErrorCode;
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -41,6 +44,14 @@ class CouponServiceTest {
     @Mock
     private OptimisticLockRetryExecutor retryExecutor;
 
+    @Mock
+    private RedisLockExecutor redisLockExecutor;
+
+    @Mock
+    private LockKeyGenerator lockKeyGenerator;
+
+    @Mock
+    private TransactionTemplate transactionTemplate;
 
     @InjectMocks
     private CouponQueryService couponQueryService;
@@ -77,6 +88,24 @@ class CouponServiceTest {
             var operation = invocation.getArgument(0, java.util.function.Supplier.class);
             return operation.get();
         });
+
+        // redisLockExecutor.executeWithLock()이 호출되면 실제로 action을 실행
+        lenient().when(redisLockExecutor.executeWithLock(any(), any())).thenAnswer(invocation -> {
+            var action = invocation.getArgument(1, java.util.function.Supplier.class);
+            return action.get();
+        });
+
+        // transactionTemplate.execute()가 호출되면 실제로 callback을 실행
+        lenient().when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            var callback = invocation.getArgument(0, org.springframework.transaction.support.TransactionCallback.class);
+            return callback.doInTransaction(null);
+        });
+
+        // lockKeyGenerator mock 설정
+        lenient().when(lockKeyGenerator.generateCouponIssueLockKey(anyLong()))
+                .thenReturn("lock:coupon:issue:1");
+        lenient().when(lockKeyGenerator.generateCouponUseLockKey(anyLong()))
+                .thenReturn("lock:coupon:user:1");
     }
 
     @Nested
@@ -152,7 +181,7 @@ class CouponServiceTest {
             Long couponId = 1L;
             Coupon decreasedCoupon = testCoupon.decreaseQuantity();
 
-            given(couponRepository.findByIdForUpdate(anyLong())).willReturn(Optional.of(testCoupon));
+            given(couponRepository.findById(anyLong())).willReturn(Optional.of(testCoupon));
             given(couponUserRepository.findByUserIdAndCouponId(anyLong(), anyLong()))
                     .willReturn(Optional.empty());
             given(couponRepository.save(any(Coupon.class))).willReturn(decreasedCoupon);
@@ -167,7 +196,7 @@ class CouponServiceTest {
             assertThat(result.getCouponId()).isEqualTo(couponId);
             assertThat(result.isUsed()).isFalse();
 
-            verify(couponRepository).findByIdForUpdate(couponId);
+            verify(couponRepository).findById(couponId);
             verify(couponUserRepository).findByUserIdAndCouponId(userId, couponId);
             verify(couponRepository).save(any(Coupon.class));
             verify(couponUserRepository).save(any(CouponUser.class));
@@ -179,7 +208,7 @@ class CouponServiceTest {
             // given
             Long userId = 1L;
             Long couponId = 999L;
-            given(couponRepository.findByIdForUpdate(anyLong())).willReturn(Optional.empty());
+            given(couponRepository.findById(anyLong())).willReturn(Optional.empty());
 
             // when & then
             assertThatThrownBy(() -> couponCommandService.issueCoupon(userId, couponId))
@@ -188,7 +217,7 @@ class CouponServiceTest {
                     .extracting("errorCode")
                     .isEqualTo(CouponErrorCode.COUPON_NOT_FOUND);
 
-            verify(couponRepository).findByIdForUpdate(couponId);
+            verify(couponRepository).findById(couponId);
         }
 
         @Test
@@ -198,7 +227,7 @@ class CouponServiceTest {
             Long userId = 1L;
             Long couponId = 1L;
 
-            given(couponRepository.findByIdForUpdate(anyLong())).willReturn(Optional.of(testCoupon));
+            given(couponRepository.findById(anyLong())).willReturn(Optional.of(testCoupon));
             given(couponUserRepository.findByUserIdAndCouponId(anyLong(), anyLong()))
                     .willReturn(Optional.of(testCouponUser));
 
@@ -208,7 +237,7 @@ class CouponServiceTest {
                     .extracting("errorCode")
                     .isEqualTo(CouponErrorCode.COUPON_ALREADY_ISSUED);
 
-            verify(couponRepository).findByIdForUpdate(couponId);
+            verify(couponRepository).findById(couponId);
             verify(couponUserRepository).findByUserIdAndCouponId(userId, couponId);
         }
 
@@ -226,7 +255,7 @@ class CouponServiceTest {
                     LocalDateTime.now().plusDays(30)
             ).decreaseQuantity();
 
-            given(couponRepository.findByIdForUpdate(anyLong())).willReturn(Optional.of(soldOutCoupon));
+            given(couponRepository.findById(anyLong())).willReturn(Optional.of(soldOutCoupon));
 
             // when & then
             assertThatThrownBy(() -> couponCommandService.issueCoupon(userId, couponId))
@@ -234,7 +263,7 @@ class CouponServiceTest {
                     .extracting("errorCode")
                     .isEqualTo(CouponErrorCode.COUPON_SOLD_OUT);
 
-            verify(couponRepository).findByIdForUpdate(couponId);
+            verify(couponRepository).findById(couponId);
         }
 
         @Test
@@ -245,7 +274,7 @@ class CouponServiceTest {
             Long couponId = 1L;
             Coupon disabledCoupon = testCoupon.disable();
 
-            given(couponRepository.findByIdForUpdate(anyLong())).willReturn(Optional.of(disabledCoupon));
+            given(couponRepository.findById(anyLong())).willReturn(Optional.of(disabledCoupon));
 
             // when & then
             assertThatThrownBy(() -> couponCommandService.issueCoupon(userId, couponId))
@@ -253,7 +282,7 @@ class CouponServiceTest {
                     .extracting("errorCode")
                     .isEqualTo(CouponErrorCode.COUPON_NOT_ACTIVE);
 
-            verify(couponRepository).findByIdForUpdate(couponId);
+            verify(couponRepository).findById(couponId);
         }
 
         @Test
@@ -270,7 +299,7 @@ class CouponServiceTest {
                     LocalDateTime.now().minusDays(1)
             );
 
-            given(couponRepository.findByIdForUpdate(anyLong())).willReturn(Optional.of(expiredCoupon));
+            given(couponRepository.findById(anyLong())).willReturn(Optional.of(expiredCoupon));
 
             // when & then
             assertThatThrownBy(() -> couponCommandService.issueCoupon(userId, couponId))
@@ -278,7 +307,7 @@ class CouponServiceTest {
                     .extracting("errorCode")
                     .isEqualTo(CouponErrorCode.COUPON_EXPIRED);
 
-            verify(couponRepository).findByIdForUpdate(couponId);
+            verify(couponRepository).findById(couponId);
         }
     }
 
@@ -385,94 +414,6 @@ class CouponServiceTest {
             // then
             assertThat(result).hasSize(2);
             verify(couponUserRepository).findByUserId(userId);
-        }
-    }
-
-    @Nested
-    @DisplayName("쿠폰 사용 테스트")
-    class UseCouponTest {
-
-        @Test
-        @DisplayName("쿠폰 사용에 성공한다")
-        void useCoupon_success() {
-            // given
-            Long couponUserId = 1L;
-            Long orderId = 100L;
-            CouponUser usedCoupon = testCouponUser.use(orderId);
-
-            given(couponUserRepository.findById(anyLong())).willReturn(Optional.of(testCouponUser));
-            given(couponUserRepository.save(any(CouponUser.class))).willReturn(usedCoupon);
-
-            // when
-            CouponUser result = couponCommandService.useCoupon(couponUserId, orderId);
-
-            // then
-            assertThat(result).isNotNull();
-            assertThat(result.isUsed()).isTrue();
-            assertThat(result.getOrderId()).isEqualTo(orderId);
-
-            verify(couponUserRepository).findById(couponUserId);
-            verify(couponUserRepository).save(any(CouponUser.class));
-        }
-
-        @Test
-        @DisplayName("존재하지 않는 쿠폰 사용 시 예외가 발생한다")
-        void useCoupon_couponUserNotFound() {
-            // given
-            Long couponUserId = 999L;
-            Long orderId = 100L;
-
-            given(couponUserRepository.findById(anyLong())).willReturn(Optional.empty());
-
-            // when & then
-            assertThatThrownBy(() -> couponCommandService.useCoupon(couponUserId, orderId))
-                    .isInstanceOf(CouponException.class)
-                    .extracting("errorCode")
-                    .isEqualTo(CouponErrorCode.COUPON_USER_NOT_FOUND);
-
-            verify(couponUserRepository).findById(couponUserId);
-        }
-
-        @Test
-        @DisplayName("이미 사용된 쿠폰을 재사용 시도하면 예외가 발생한다")
-        void useCoupon_alreadyUsed() {
-            // given
-            Long couponUserId = 1L;
-            Long orderId = 100L;
-            CouponUser usedCoupon = testCouponUser.use(orderId);
-
-            given(couponUserRepository.findById(anyLong())).willReturn(Optional.of(usedCoupon));
-
-            // when & then
-            assertThatThrownBy(() -> couponCommandService.useCoupon(couponUserId, 200L))
-                    .isInstanceOf(CouponException.class)
-                    .extracting("errorCode")
-                    .isEqualTo(CouponErrorCode.COUPON_ALREADY_USED);
-
-            verify(couponUserRepository).findById(couponUserId);
-        }
-
-        @Test
-        @DisplayName("만료된 쿠폰 사용 시 예외가 발생한다")
-        void useCoupon_expired() {
-            // given
-            Long couponUserId = 1L;
-            Long orderId = 100L;
-            CouponUser expiredCoupon = CouponUser.issue(
-                    1L,
-                    1L,
-                    LocalDateTime.now().minusDays(1)
-            );
-
-            given(couponUserRepository.findById(anyLong())).willReturn(Optional.of(expiredCoupon));
-
-            // when & then
-            assertThatThrownBy(() -> couponCommandService.useCoupon(couponUserId, orderId))
-                    .isInstanceOf(CouponException.class)
-                    .extracting("errorCode")
-                    .isEqualTo(CouponErrorCode.COUPON_USER_EXPIRED);
-
-            verify(couponUserRepository).findById(couponUserId);
         }
     }
 

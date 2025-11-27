@@ -29,7 +29,7 @@ public enum CouponErrorCode {
     private final HttpStatus httpStatus;
 
     public String getMessageWithDetails(Object... args) {
-        return String.format("%s (현재값: %s)", message, formatArgs(args));
+        return "%s (현재값: %s)".formatted(message, formatArgs(args));
     }
 
     private String formatArgs(Object... args) {

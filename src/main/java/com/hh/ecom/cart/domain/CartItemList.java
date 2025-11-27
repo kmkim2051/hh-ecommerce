@@ -49,7 +49,6 @@ public class CartItemList {
                 });
     }
 
-    // 공통적으로 productId → Product 매핑 및 존재여부 검증을 수행
     private Map<CartItem, Product> mapCartItemsToProducts(List<Product> products) {
         Map<Long, Product> productIdMap = products.stream()
                 .collect(Collectors.toMap(Product::getId, Function.identity()));
@@ -71,7 +70,7 @@ public class CartItemList {
             if (!product.hasEnoughStock(item.getQuantity())) {
                 throw new OrderException(
                         OrderErrorCode.INVALID_ORDER_STATUS,
-                        String.format("상품 '%s'의 재고가 부족합니다. 요청: %d, 재고: %d",
+                        "상품 '%s'의 재고가 부족합니다. 요청: %d, 재고: %d".formatted(
                                 product.getName(), item.getQuantity(), product.getStockQuantity())
                 );
             }

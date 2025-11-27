@@ -119,30 +119,6 @@ class PointControllerIntegrationTest extends TestContainersConfig {
     }
 
     @Test
-    @DisplayName("포인트 사용 후 거래 내역에 기록된다")
-    void getPointTransactions_AfterUse() {
-        // given
-        pointService.chargePoint(testUserId, BigDecimal.valueOf(20000));
-        pointService.usePoint(testUserId, BigDecimal.valueOf(5000), 1L);
-
-        // when
-        ResponseEntity<List<PointTransaction>> response = pointController.getPointTransactions(testUserId);
-
-        // then
-        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody()).hasSize(2);
-
-        PointTransaction chargeTransaction = response.getBody().get(0);
-        PointTransaction useTransaction = response.getBody().get(1);
-
-        assertThat(chargeTransaction.getType().name()).isEqualTo("CHARGE");
-        assertThat(chargeTransaction.getAmount()).isEqualByComparingTo(BigDecimal.valueOf(20000));
-        assertThat(useTransaction.getType().name()).isEqualTo("USE");
-        assertThat(useTransaction.getAmount()).isEqualByComparingTo(BigDecimal.valueOf(5000));
-    }
-
-    @Test
     @DisplayName("포인트가 없는 사용자의 거래 내역 조회 시 실패한다")
     void getPointTransactions_NotFound() {
         // when & then

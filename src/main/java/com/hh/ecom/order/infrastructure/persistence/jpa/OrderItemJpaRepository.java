@@ -17,8 +17,8 @@ public interface OrderItemJpaRepository extends JpaRepository<OrderItemEntity, L
      * - 판매량 내림차순 정렬
      */
     @Query(value = """
-        SELECT 
-          oi.product_id as productId, 
+        SELECT
+          oi.product_id as productId,
           SUM(oi.quantity) as salesCount
         FROM order_items oi
         INNER JOIN orders o ON oi.order_id = o.id
@@ -29,9 +29,23 @@ public interface OrderItemJpaRepository extends JpaRepository<OrderItemEntity, L
         """, nativeQuery = true)
     List<ProductSalesProjection> findTopProductsBySalesCount(@Param("limit") int limit);
 
-    /**
-     * 집계 결과 Projection 인터페이스
-     */
+    @Query(value = """
+        SELECT
+          oi.product_id as productId,
+          SUM(oi.quantity) as salesCount
+        FROM order_items oi
+        INNER JOIN orders o ON oi.order_id = o.id
+        WHERE o.status = 'COMPLETED'
+          AND o.created_at >= DATE_SUB(NOW(), INTERVAL :days DAY)
+        GROUP BY oi.product_id
+        ORDER BY salesCount DESC
+        LIMIT :limit
+        """, nativeQuery = true)
+    List<ProductSalesProjection> findTopProductsBySalesCountInRecentDays(
+            @Param("days") int days,
+            @Param("limit") int limit
+    );
+
     interface ProductSalesProjection {
         Long getProductId();
         Long getSalesCount();

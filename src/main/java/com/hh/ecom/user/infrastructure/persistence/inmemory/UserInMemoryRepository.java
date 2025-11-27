@@ -9,7 +9,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-
+@Deprecated
 public class UserInMemoryRepository implements UserRepository {
     private final Map<Long, UserEntity> users = new ConcurrentHashMap<>();
     private final AtomicLong idGenerator = new AtomicLong(1);

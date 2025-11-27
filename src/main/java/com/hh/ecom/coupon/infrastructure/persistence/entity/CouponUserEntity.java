@@ -11,10 +11,6 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
-/**
- * JPA CouponUser Entity
- * Optimistic locking with @Version
- */
 @Entity
 @Table(name = "coupon_user",
        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "coupon_id"}))

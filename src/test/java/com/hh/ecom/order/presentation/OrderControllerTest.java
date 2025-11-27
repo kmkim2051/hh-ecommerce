@@ -1,7 +1,8 @@
 package com.hh.ecom.order.presentation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hh.ecom.order.application.OrderService;
+import com.hh.ecom.order.application.OrderCommandService;
+import com.hh.ecom.order.application.OrderQueryService;
 import com.hh.ecom.order.domain.Order;
 import com.hh.ecom.order.domain.OrderItem;
 import com.hh.ecom.order.domain.OrderStatus;
@@ -39,7 +40,10 @@ class OrderControllerTest {
     private ObjectMapper objectMapper;
 
     @MockitoBean
-    private OrderService orderService;
+    private OrderCommandService orderCommandService;
+
+    @MockitoBean
+    private OrderQueryService orderQueryService;
 
     @Test
     @DisplayName("POST /orders - 주문 생성 성공")
@@ -52,7 +56,7 @@ class OrderControllerTest {
                 BigDecimal.valueOf(100000), BigDecimal.ZERO, BigDecimal.valueOf(100000),
                 OrderStatus.PAID, null);
 
-        given(orderService.createOrder(eq(userId), any())).willReturn(order);
+        given(orderCommandService.createOrder(eq(userId), any())).willReturn(order);
 
         // When & Then
         mockMvc.perform(post("/orders")
@@ -71,7 +75,7 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.couponUserId").isEmpty())
                 .andExpect(jsonPath("$.items", hasSize(2)));
 
-        verify(orderService, times(1)).createOrder(eq(userId), any());
+        verify(orderCommandService, times(1)).createOrder(eq(userId), any());
     }
 
     @Test
@@ -87,7 +91,7 @@ class OrderControllerTest {
                 BigDecimal.valueOf(100000), BigDecimal.valueOf(10000), BigDecimal.valueOf(90000),
                 OrderStatus.PAID, couponUserId);
 
-        given(orderService.createOrder(eq(userId), any())).willReturn(order);
+        given(orderCommandService.createOrder(eq(userId), any())).willReturn(order);
 
         // When & Then
         mockMvc.perform(post("/orders")
@@ -101,7 +105,7 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.finalAmount").value(90000))
                 .andExpect(jsonPath("$.couponUserId").value(couponUserId));
 
-        verify(orderService, times(1)).createOrder(eq(userId), any());
+        verify(orderCommandService, times(1)).createOrder(eq(userId), any());
     }
     @Test
     @DisplayName("POST /orders - 빈 장바구니로 주문 생성 시도")
@@ -110,7 +114,7 @@ class OrderControllerTest {
         Long userId = 1L;
         CreateOrderRequest request = new CreateOrderRequest(List.of(), null);
 
-        given(orderService.createOrder(eq(userId), any()))
+        given(orderCommandService.createOrder(eq(userId), any()))
                 .willThrow(new OrderException(OrderErrorCode.EMPTY_ORDER_ITEMS));
 
         // When & Then
@@ -121,7 +125,7 @@ class OrderControllerTest {
                 .andDo(print())
                 .andExpect(status().isBadRequest());
 
-        verify(orderService, times(1)).createOrder(eq(userId), any());
+        verify(orderCommandService, times(1)).createOrder(eq(userId), any());
     }
 
     @Test
@@ -131,7 +135,7 @@ class OrderControllerTest {
         Long userId = 1L;
         CreateOrderRequest request = new CreateOrderRequest(List.of(100L), null);
 
-        given(orderService.createOrder(eq(userId), any()))
+        given(orderCommandService.createOrder(eq(userId), any()))
                 .willThrow(new OrderException(OrderErrorCode.INVALID_ORDER_AMOUNT));
 
         // When & Then
@@ -142,7 +146,7 @@ class OrderControllerTest {
                 .andDo(print())
                 .andExpect(status().isBadRequest());
 
-        verify(orderService, times(1)).createOrder(eq(userId), any());
+        verify(orderCommandService, times(1)).createOrder(eq(userId), any());
     }
 
     @Test
@@ -160,7 +164,7 @@ class OrderControllerTest {
                         OrderStatus.COMPLETED, 10L)
         );
 
-        given(orderService.getOrders(userId)).willReturn(orders);
+        given(orderQueryService.getOrders(userId)).willReturn(orders);
 
         // When & Then
         mockMvc.perform(get("/orders")
@@ -175,7 +179,7 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.orders[1].orderNumber").value("ORDER-123457"))
                 .andExpect(jsonPath("$.orders[1].status").value("COMPLETED"));
 
-        verify(orderService, times(1)).getOrders(userId);
+        verify(orderQueryService, times(1)).getOrders(userId);
     }
 
     @Test
@@ -183,7 +187,7 @@ class OrderControllerTest {
     void getOrders_Empty() throws Exception {
         // Given
         Long userId = 1L;
-        given(orderService.getOrders(userId)).willReturn(List.of());
+        given(orderQueryService.getOrders(userId)).willReturn(List.of());
 
         // When & Then
         mockMvc.perform(get("/orders")
@@ -192,7 +196,7 @@ class OrderControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.orders", hasSize(0)));
 
-        verify(orderService, times(1)).getOrders(userId);
+        verify(orderQueryService, times(1)).getOrders(userId);
     }
 
     @Test
@@ -206,7 +210,7 @@ class OrderControllerTest {
                 BigDecimal.valueOf(100000), BigDecimal.ZERO, BigDecimal.valueOf(100000),
                 OrderStatus.PAID, null);
 
-        given(orderService.getOrder(orderId, userId)).willReturn(order);
+        given(orderQueryService.getOrder(orderId, userId)).willReturn(order);
 
         // When & Then
         mockMvc.perform(get("/orders/{id}", orderId)
@@ -219,7 +223,7 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.status").value("PAID"))
                 .andExpect(jsonPath("$.items", hasSize(2)));
 
-        verify(orderService, times(1)).getOrder(orderId, userId);
+        verify(orderQueryService, times(1)).getOrder(orderId, userId);
     }
 
     @Test
@@ -229,7 +233,7 @@ class OrderControllerTest {
         Long userId = 1L;
         Long orderId = 99999L;
 
-        given(orderService.getOrder(orderId, userId))
+        given(orderQueryService.getOrder(orderId, userId))
                 .willThrow(new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
 
         // When & Then
@@ -238,7 +242,7 @@ class OrderControllerTest {
                 .andDo(print())
                 .andExpect(status().isNotFound());
 
-        verify(orderService, times(1)).getOrder(orderId, userId);
+        verify(orderQueryService, times(1)).getOrder(orderId, userId);
     }
 
     @Test
@@ -249,7 +253,7 @@ class OrderControllerTest {
         Long otherUserId = 2L;
         Long orderId = 100L;
 
-        given(orderService.getOrder(orderId, otherUserId))
+        given(orderQueryService.getOrder(orderId, otherUserId))
                 .willThrow(new OrderException(OrderErrorCode.UNAUTHORIZED_ORDER_ACCESS));
 
         // When & Then
@@ -258,7 +262,7 @@ class OrderControllerTest {
                 .andDo(print())
                 .andExpect(status().isForbidden());
 
-        verify(orderService, times(1)).getOrder(orderId, otherUserId);
+        verify(orderQueryService, times(1)).getOrder(orderId, otherUserId);
     }
 
     // Helper methods
