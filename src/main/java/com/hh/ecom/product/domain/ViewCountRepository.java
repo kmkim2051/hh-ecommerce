@@ -11,4 +11,6 @@ public interface ViewCountRepository {
     Long getDelta(Long productId);
 
     List<Long> getTopViewedProductIds(Integer days, Integer limit);
+
+    void flushBuffer();
 }

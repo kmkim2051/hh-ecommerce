@@ -55,6 +55,9 @@ class ProductServiceIntegrationTest extends TestContainersConfig {
             productService.getProduct(productId);
             productService.getProduct(productId);
 
+            // 버퍼링된 조회수를 Redis에 flush
+            viewCountRepository.flushBuffer();
+
             // then
             Long delta = viewCountRepository.getDelta(productId);
             assertThat(delta).isEqualTo(3);
@@ -82,6 +85,9 @@ class ProductServiceIntegrationTest extends TestContainersConfig {
             productService.getProduct(product2.getId()); // product2: 2회
 
             productService.getProduct(product3.getId()); // product3: 1회
+
+            // 버퍼링된 조회수를 Redis에 flush
+            viewCountRepository.flushBuffer();
 
             // when
             List<Product> result = productService.getProductsByViewCountInRecentDays(1, 10);
