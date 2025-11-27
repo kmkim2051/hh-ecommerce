@@ -8,6 +8,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+@Deprecated
 public class OrderInMemoryRepository implements OrderRepository {
 
     private final Map<Long, OrderEntity> storage = new ConcurrentHashMap<>();

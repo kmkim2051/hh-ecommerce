@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Deprecated
 public class ProductInMemoryRepository implements ProductRepository {
     private final Map<Long, ProductEntity> products = new ConcurrentHashMap<>();
 
@@ -72,9 +73,25 @@ public class ProductInMemoryRepository implements ProductRepository {
 
     @Override
     public List<Product> findTopBySalesCount(Integer limit) {
-        // InMemory 구현: OrderItem 집계가 필요하므로 빈 리스트 반환
         // 실제 구현은 OrderItemRepository 의존성이 필요
         return List.of();
+    }
+
+    @Override
+    public List<Product> findTopByViewCountInRecentDays(Integer days, Integer limit) {
+        // 실제로는 ProductView 테이블 기반으로 집계해야 함
+        return findTopByViewCount(limit);
+    }
+
+    @Override
+    public List<Product> findTopBySalesCountInRecentDays(Integer days, Integer limit) {
+        // 실제 구현은 OrderItemRepository 의존성이 필요
+        return List.of();
+    }
+
+    @Override
+    public void saveProductView(Long productId) {
+        // 실제 구현에서는 ProductViewEntity를 저장
     }
 
     @Override

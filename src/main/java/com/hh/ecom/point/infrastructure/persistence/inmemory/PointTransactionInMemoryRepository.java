@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+@Deprecated
 public class PointTransactionInMemoryRepository implements PointTransactionRepository {
     private final Map<Long, PointTransactionEntity> transactions = new ConcurrentHashMap<>();
     private final AtomicLong idGenerator = new AtomicLong(1);
