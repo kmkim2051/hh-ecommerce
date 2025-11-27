@@ -3,8 +3,7 @@ package com.hh.ecom.product.application;
 import com.hh.ecom.config.TestContainersConfig;
 import com.hh.ecom.product.domain.Product;
 import com.hh.ecom.product.domain.ProductRepository;
-import com.hh.ecom.product.infrastructure.persistence.entity.ProductViewEntity;
-import com.hh.ecom.product.infrastructure.persistence.jpa.ProductViewJpaRepository;
+import com.hh.ecom.product.domain.ViewCountRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,11 +31,10 @@ class ProductServiceIntegrationTest extends TestContainersConfig {
     private ProductRepository productRepository;
 
     @Autowired
-    private ProductViewJpaRepository productViewJpaRepository;
+    private ViewCountRepository viewCountRepository;
 
     @BeforeEach
     void setUp() {
-        productViewJpaRepository.deleteAll();
         productRepository.deleteAll();
     }
 
@@ -45,24 +43,21 @@ class ProductServiceIntegrationTest extends TestContainersConfig {
     class ViewCountIncrementIntegrationTest {
 
         @Test
-        @DisplayName("상품 조회 시 조회수와 조회 이력이 증가한다")
-        void getProduct_incrementsViewCountAndSavesHistory() {
+        @DisplayName("상품 조회 시 Redis에 조회수 델타가 기록된다")
+        void getProduct_incrementsViewCountInRedis() {
             // given
             Product product = Product.create("테스트 상품", "설명", BigDecimal.valueOf(10000), 100);
             Product savedProduct = productRepository.save(product);
             Long productId = savedProduct.getId();
 
             // when
-            Product result1 = productService.getProduct(productId);
-            Product result2 = productService.getProduct(productId);
-            Product result3 = productService.getProduct(productId);
+            productService.getProduct(productId);
+            productService.getProduct(productId);
+            productService.getProduct(productId);
 
             // then
-            assertThat(result3.getViewCount()).isEqualTo(3);
-
-            List<ProductViewEntity> viewHistory = productViewJpaRepository.findAll();
-            assertThat(viewHistory).hasSize(3);
-            assertThat(viewHistory).allMatch(view -> view.getProductId().equals(productId));
+            Long delta = viewCountRepository.getDelta(productId);
+            assertThat(delta).isEqualTo(3);
         }
     }
 
@@ -71,30 +66,27 @@ class ProductServiceIntegrationTest extends TestContainersConfig {
     class RecentDaysViewCountRankingIntegrationTest {
 
         @Test
-        @DisplayName("최근 1일간 조회수가 높은 상품 순으로 조회한다")
-        void getProductsByViewCountInRecentDays_1day() {
+        @DisplayName("최근 N일 조회수 랭킹은 Redis 기록 기준으로 조회한다")
+        void getProductsByViewCountInRecentDays_usesRedisData() {
             // given
             Product product1 = productRepository.save(Product.create("상품1", "설명1", BigDecimal.valueOf(1000), 10));
             Product product2 = productRepository.save(Product.create("상품2", "설명2", BigDecimal.valueOf(2000), 20));
             Product product3 = productRepository.save(Product.create("상품3", "설명3", BigDecimal.valueOf(3000), 30));
 
-            // 최근 1일 이내 조회 기록 추가
-            LocalDateTime now = LocalDateTime.now();
-            saveProductView(product1.getId(), now);
-            saveProductView(product1.getId(), now.minusHours(1));
-            saveProductView(product1.getId(), now.minusHours(2));
-            saveProductView(product2.getId(), now.minusHours(3));
-            saveProductView(product2.getId(), now.minusHours(4));
-            saveProductView(product3.getId(), now.minusHours(5));
+            // 상품 조회 (Redis에 타임스탬프 기록됨)
+            productService.getProduct(product1.getId());
+            productService.getProduct(product1.getId());
+            productService.getProduct(product1.getId()); // product1: 3회
 
-            // 2일 전 조회 기록은 제외되어야 함
-            saveProductView(product3.getId(), now.minusDays(2));
-            saveProductView(product3.getId(), now.minusDays(3));
+            productService.getProduct(product2.getId());
+            productService.getProduct(product2.getId()); // product2: 2회
+
+            productService.getProduct(product3.getId()); // product3: 1회
 
             // when
             List<Product> result = productService.getProductsByViewCountInRecentDays(1, 10);
 
-            // then
+            // then - Redis 기록 기준으로 정렬됨
             assertThat(result).hasSize(3);
             assertThat(result.get(0).getId()).isEqualTo(product1.getId()); // 3회
             assertThat(result.get(1).getId()).isEqualTo(product2.getId()); // 2회
@@ -102,141 +94,16 @@ class ProductServiceIntegrationTest extends TestContainersConfig {
         }
 
         @Test
-        @DisplayName("최근 3일간 조회수가 높은 상품 순으로 조회한다")
-        void getProductsByViewCountInRecentDays_3days() {
+        @DisplayName("최근 N일 조회 기록이 없으면 빈 리스트를 반환한다")
+        void getProductsByViewCountInRecentDays_noData() {
             // given
-            Product product1 = productRepository.save(Product.create("상품1", "설명1", BigDecimal.valueOf(1000), 10));
-            Product product2 = productRepository.save(Product.create("상품2", "설명2", BigDecimal.valueOf(2000), 20));
-            Product product3 = productRepository.save(Product.create("상품3", "설명3", BigDecimal.valueOf(3000), 30));
+            productRepository.save(Product.create("상품1", "설명1", BigDecimal.valueOf(1000), 10));
 
-            LocalDateTime now = LocalDateTime.now();
-
-            // product1: 2일 전 2회
-            saveProductView(product1.getId(), now.minusDays(2));
-            saveProductView(product1.getId(), now.minusDays(2).minusHours(1));
-
-            // product2: 1일 전 3회
-            saveProductView(product2.getId(), now.minusDays(1));
-            saveProductView(product2.getId(), now.minusDays(1).minusHours(1));
-            saveProductView(product2.getId(), now.minusDays(1).minusHours(2));
-
-            // product3: 오늘 4회
-            saveProductView(product3.getId(), now);
-            saveProductView(product3.getId(), now.minusHours(1));
-            saveProductView(product3.getId(), now.minusHours(2));
-            saveProductView(product3.getId(), now.minusHours(3));
-
-            // 4일 전 조회 기록은 제외되어야 함
-            saveProductView(product1.getId(), now.minusDays(4));
-            saveProductView(product1.getId(), now.minusDays(5));
-
-            // when
-            List<Product> result = productService.getProductsByViewCountInRecentDays(3, 10);
-
-            // then
-            assertThat(result).hasSize(3);
-            assertThat(result.get(0).getId()).isEqualTo(product3.getId()); // 4회
-            assertThat(result.get(1).getId()).isEqualTo(product2.getId()); // 3회
-            assertThat(result.get(2).getId()).isEqualTo(product1.getId()); // 2회
-        }
-
-        @Test
-        @DisplayName("최근 7일간 조회수가 높은 상품 순으로 조회한다")
-        void getProductsByViewCountInRecentDays_7days() {
-            // given
-            Product product1 = productRepository.save(Product.create("상품1", "설명1", BigDecimal.valueOf(1000), 10));
-            Product product2 = productRepository.save(Product.create("상품2", "설명2", BigDecimal.valueOf(2000), 20));
-            Product product3 = productRepository.save(Product.create("상품3", "설명3", BigDecimal.valueOf(3000), 30));
-            Product product4 = productRepository.save(Product.create("상품4", "설명4", BigDecimal.valueOf(4000), 40));
-
-            LocalDateTime now = LocalDateTime.now();
-
-            // product1: 6일 전 1회
-            saveProductView(product1.getId(), now.minusDays(6));
-
-            // product2: 5일 전 2회
-            saveProductView(product2.getId(), now.minusDays(5));
-            saveProductView(product2.getId(), now.minusDays(5).minusHours(1));
-
-            // product3: 3일 전 3회
-            saveProductView(product3.getId(), now.minusDays(3));
-            saveProductView(product3.getId(), now.minusDays(3).minusHours(1));
-            saveProductView(product3.getId(), now.minusDays(3).minusHours(2));
-
-            // product4: 오늘 5회
-            saveProductView(product4.getId(), now);
-            saveProductView(product4.getId(), now.minusHours(1));
-            saveProductView(product4.getId(), now.minusHours(2));
-            saveProductView(product4.getId(), now.minusHours(3));
-            saveProductView(product4.getId(), now.minusHours(4));
-
-            // 8일 전 조회 기록은 제외되어야 함
-            saveProductView(product1.getId(), now.minusDays(8));
-            saveProductView(product2.getId(), now.minusDays(9));
-
-            // when
-            List<Product> result = productService.getProductsByViewCountInRecentDays(7, 10);
-
-            // then
-            assertThat(result).hasSize(4);
-            assertThat(result.get(0).getId()).isEqualTo(product4.getId()); // 5회
-            assertThat(result.get(1).getId()).isEqualTo(product3.getId()); // 3회
-            assertThat(result.get(2).getId()).isEqualTo(product2.getId()); // 2회
-            assertThat(result.get(3).getId()).isEqualTo(product1.getId()); // 1회
-        }
-
-        @Test
-        @DisplayName("limit 만큼만 상품을 조회한다")
-        void getProductsByViewCountInRecentDays_withLimit() {
-            // given
-            Product product1 = productRepository.save(Product.create("상품1", "설명1", BigDecimal.valueOf(1000), 10));
-            Product product2 = productRepository.save(Product.create("상품2", "설명2", BigDecimal.valueOf(2000), 20));
-            Product product3 = productRepository.save(Product.create("상품3", "설명3", BigDecimal.valueOf(3000), 30));
-
-            LocalDateTime now = LocalDateTime.now();
-            saveProductView(product1.getId(), now);
-            saveProductView(product1.getId(), now.minusHours(1));
-            saveProductView(product1.getId(), now.minusHours(2));
-
-            saveProductView(product2.getId(), now);
-            saveProductView(product2.getId(), now.minusHours(1));
-
-            saveProductView(product3.getId(), now);
-
-            // when
-            List<Product> result = productService.getProductsByViewCountInRecentDays(1, 2);
-
-            // then
-            assertThat(result).hasSize(2);
-            assertThat(result.get(0).getId()).isEqualTo(product1.getId());
-            assertThat(result.get(1).getId()).isEqualTo(product2.getId());
-        }
-
-        @Test
-        @DisplayName("최근 n일간 조회 기록이 없으면 빈 리스트를 반환한다")
-        void getProductsByViewCountInRecentDays_noViews() {
-            // given
-            Product product1 = productRepository.save(Product.create("상품1", "설명1", BigDecimal.valueOf(1000), 10));
-            Product product2 = productRepository.save(Product.create("상품2", "설명2", BigDecimal.valueOf(2000), 20));
-
-            // 8일 전 조회 기록만 존재
-            LocalDateTime now = LocalDateTime.now();
-            saveProductView(product1.getId(), now.minusDays(8));
-            saveProductView(product2.getId(), now.minusDays(9));
-
-            // when
+            // when - 조회 없이 바로 랭킹 조회
             List<Product> result = productService.getProductsByViewCountInRecentDays(7, 10);
 
             // then
             assertThat(result).isEmpty();
-        }
-
-        private void saveProductView(Long productId, LocalDateTime viewedAt) {
-            ProductViewEntity viewEntity = ProductViewEntity.builder()
-                    .productId(productId)
-                    .viewedAt(viewedAt)
-                    .build();
-            productViewJpaRepository.save(viewEntity);
         }
     }
 

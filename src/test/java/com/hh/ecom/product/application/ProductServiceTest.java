@@ -2,6 +2,7 @@ package com.hh.ecom.product.application;
 
 import com.hh.ecom.product.domain.Product;
 import com.hh.ecom.product.domain.ProductRepository;
+import com.hh.ecom.product.domain.ViewCountRepository;
 import com.hh.ecom.product.domain.exception.ProductErrorCode;
 import com.hh.ecom.product.domain.exception.ProductException;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +36,9 @@ class ProductServiceTest {
 
     @Mock
     private ProductRepository productRepository;
+
+    @Mock
+    private ViewCountRepository viewCountRepository;
 
     @InjectMocks
     private ProductService productService;
@@ -177,24 +181,21 @@ class ProductServiceTest {
     class GetProductWithViewCountIncrementTest {
 
         @Test
-        @DisplayName("상품 조회 시 조회수가 증가한다")
+        @DisplayName("상품 조회 시 Redis에 조회수 델타를 기록한다")
         void getProduct_incrementsViewCount() {
             // given
             Long productId = 1L;
             Product product = testProduct.toBuilder().id(productId).viewCount(5).build();
-            Product increasedProduct = product.increaseViewCount();
 
             given(productRepository.findById(productId)).willReturn(Optional.of(product));
-            given(productRepository.save(any(Product.class))).willReturn(increasedProduct);
 
             // when
             Product result = productService.getProduct(productId);
 
             // then
-            assertThat(result.getViewCount()).isEqualTo(6);
+            assertThat(result.getViewCount()).isEqualTo(5); // DB 값 그대로 반환
             verify(productRepository).findById(productId);
-            verify(productRepository).save(any(Product.class));
-            verify(productRepository).saveProductView(productId);
+            verify(viewCountRepository).incrementViewCount(productId); // Redis 증가 확인
         }
     }
 
