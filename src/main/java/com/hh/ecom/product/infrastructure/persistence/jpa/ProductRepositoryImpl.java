@@ -4,27 +4,27 @@ import com.hh.ecom.order.domain.ProductSalesCount;
 import com.hh.ecom.order.infrastructure.persistence.jpa.OrderItemJpaRepository;
 import com.hh.ecom.product.domain.Product;
 import com.hh.ecom.product.domain.ProductRepository;
+import com.hh.ecom.product.domain.ViewCountRepository;
 import com.hh.ecom.product.infrastructure.persistence.entity.ProductEntity;
-import com.hh.ecom.product.infrastructure.persistence.entity.ProductViewEntity;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Primary
 @Repository
 @RequiredArgsConstructor
-@Primary
 public class ProductRepositoryImpl implements ProductRepository {
     private final ProductJpaRepository productJpaRepository;
     private final OrderItemJpaRepository orderItemJpaRepository;
-    private final ProductViewJpaRepository productViewJpaRepository;
+    private final ViewCountRepository viewCountRepository;
 
     @Override
     public Page<Product> findAll(Pageable pageable) {
@@ -85,22 +85,7 @@ public class ProductRepositoryImpl implements ProductRepository {
                         projection.getSalesCount()
                 ))
                 .toList();
-
-        if (salesCounts.isEmpty()) {
-            return List.of();
-        }
-
-        List<Long> topProductIds = salesCounts.stream()
-                .map(ProductSalesCount::getProductId)
-                .toList();
-
-        Map<Long, Product> productMap = findByIdsIn(topProductIds).stream()
-                .collect(Collectors.toMap(Product::getId, p -> p));
-
-        return topProductIds.stream()
-                .map(productMap::get)
-                .filter(java.util.Objects::nonNull)
-                .toList();
+        return getTopProductsInSalesCount(salesCounts);
     }
 
     @Override
@@ -117,21 +102,7 @@ public class ProductRepositoryImpl implements ProductRepository {
                 ))
                 .toList();
 
-        if (salesCounts.isEmpty()) {
-            return List.of();
-        }
-
-        List<Long> topProductIds = salesCounts.stream()
-                .map(ProductSalesCount::getProductId)
-                .toList();
-
-        Map<Long, Product> productMap = findByIdsIn(topProductIds).stream()
-                .collect(Collectors.toMap(Product::getId, p -> p));
-
-        return topProductIds.stream()
-                .map(productMap::get)
-                .filter(java.util.Objects::nonNull)
-                .toList();
+        return getTopProductsInSalesCount(salesCounts);
     }
 
     @Override
@@ -147,38 +118,33 @@ public class ProductRepositoryImpl implements ProductRepository {
             return List.of();
         }
 
-        LocalDateTime startDate = LocalDateTime.now().minusDays(days);
-        List<ProductViewJpaRepository.ProductViewCountProjection> viewCounts = productViewJpaRepository
-                .findTopProductsByViewCountSince(startDate, limit);
-
-        if (viewCounts.isEmpty()) {
-            return List.of();
-        }
-
-        List<Long> topProductIds = viewCounts.stream()
-                .map(ProductViewJpaRepository.ProductViewCountProjection::getProductId)
-                .toList();
-
-        Map<Long, Product> productMap = findByIdsIn(topProductIds).stream()
-                .collect(Collectors.toMap(Product::getId, p -> p));
-
-        return topProductIds.stream()
-                .map(productMap::get)
-                .filter(java.util.Objects::nonNull)
-                .toList();
-    }
-
-    @Override
-    public void saveProductView(Long productId) {
-        ProductViewEntity viewEntity = ProductViewEntity.builder()
-                .productId(productId)
-                .viewedAt(LocalDateTime.now())
-                .build();
-        productViewJpaRepository.save(viewEntity);
+        List<Long> topProductIds = viewCountRepository.getTopViewedProductIds(days, limit);
+        return getProductsInSequence(topProductIds);
     }
 
     @Override
     public void deleteAll() {
         productJpaRepository.deleteAll();
+    }
+
+    private List<Product> getTopProductsInSalesCount(List<ProductSalesCount> salesCounts) {
+        List<Long> topProductIds = salesCounts.stream()
+                .map(ProductSalesCount::getProductId)
+                .toList();
+
+        return getProductsInSequence(topProductIds);
+    }
+
+    private List<Product> getProductsInSequence(List<Long> topProductIds) {
+        if (topProductIds.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Product> productMap = findByIdsIn(topProductIds).stream()
+                .collect(Collectors.toMap(Product::getId, p -> p));
+
+        return topProductIds.stream()
+                .map(productMap::get)
+                .filter(Objects::nonNull)
+                .toList();
     }
 }
