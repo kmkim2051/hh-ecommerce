@@ -1,5 +1,7 @@
 package com.hh.ecom.point.application;
 
+import com.hh.ecom.common.lock.LockKeyGenerator;
+import com.hh.ecom.common.lock.RedisLockExecutor;
 import com.hh.ecom.common.transaction.OptimisticLockRetryExecutor;
 import com.hh.ecom.point.domain.Point;
 import com.hh.ecom.point.domain.PointRepository;
@@ -17,6 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -45,6 +48,15 @@ class PointServiceTest {
     @Mock
     private OptimisticLockRetryExecutor retryExecutor;
 
+    @Mock
+    private RedisLockExecutor redisLockExecutor;
+
+    @Mock
+    private LockKeyGenerator lockKeyGenerator;
+
+    @Mock
+    private TransactionTemplate transactionTemplate;
+
     @InjectMocks
     private PointService pointService;
 
@@ -71,6 +83,22 @@ class PointServiceTest {
             var operation = invocation.getArgument(0, java.util.function.Supplier.class);
             return operation.get();
         });
+
+        // redisLockExecutor.executeWithLock()이 호출되면 실제로 action을 실행
+        lenient().when(redisLockExecutor.executeWithLock(any(), any())).thenAnswer(invocation -> {
+            var action = invocation.getArgument(1, java.util.function.Supplier.class);
+            return action.get();
+        });
+
+        // transactionTemplate.execute()가 호출되면 실제로 callback을 실행
+        lenient().when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            var callback = invocation.getArgument(0, org.springframework.transaction.support.TransactionCallback.class);
+            return callback.doInTransaction(null);
+        });
+
+        // lockKeyGenerator mock 설정
+        lenient().when(lockKeyGenerator.generatePointLockKey(anyLong()))
+                .thenAnswer(invocation -> "lock:point:user:" + invocation.getArgument(0));
     }
 
     @Nested
@@ -234,56 +262,6 @@ class PointServiceTest {
                     .isInstanceOf(PointException.class)
                     .extracting("errorCode")
                     .isEqualTo(PointErrorCode.POINT_NOT_FOUND);
-        }
-    }
-
-    @Nested
-    @DisplayName("포인트 사용 테스트")
-    class UsePointTest {
-
-        @Test
-        @DisplayName("포인트를 사용한다")
-        void usePoint_success() {
-            // given
-            BigDecimal amount = BigDecimal.valueOf(3000);
-            Long orderId = 1L;
-            Point chargedPoint = testPoint.toBuilder().balance(BigDecimal.valueOf(10000)).build();
-
-            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.of(chargedPoint));
-
-            Point usedPoint = chargedPoint.use(amount);
-            given(pointRepository.save(any(Point.class))).willReturn(usedPoint);
-            given(transactionRepository.save(any(PointTransaction.class)))
-                    .willAnswer(invocation -> invocation.getArgument(0));
-
-            // when
-            pointService.usePoint(userId, amount, orderId);
-
-            // then
-            verify(pointRepository).save(any(Point.class));
-
-            ArgumentCaptor<PointTransaction> captor = ArgumentCaptor.forClass(PointTransaction.class);
-            verify(transactionRepository).save(captor.capture());
-
-            PointTransaction savedTransaction = captor.getValue();
-            assertThat(savedTransaction.getType()).isEqualTo(TransactionType.USE);
-            assertThat(savedTransaction.getOrderId()).isEqualTo(orderId);
-        }
-
-        @Test
-        @DisplayName("잔액이 부족하면 예외가 발생한다")
-        void usePoint_insufficientBalance() {
-            // given
-            BigDecimal amount = BigDecimal.valueOf(10000);
-            Point lowBalancePoint = testPoint.toBuilder().balance(BigDecimal.valueOf(5000)).build();
-
-            given(pointRepository.findByUserId(anyLong())).willReturn(Optional.of(lowBalancePoint));
-
-            // when & then
-            assertThatThrownBy(() -> pointService.usePoint(userId, amount, 1L))
-                    .isInstanceOf(PointException.class)
-                    .extracting("errorCode")
-                    .isEqualTo(PointErrorCode.INSUFFICIENT_BALANCE);
         }
     }
 

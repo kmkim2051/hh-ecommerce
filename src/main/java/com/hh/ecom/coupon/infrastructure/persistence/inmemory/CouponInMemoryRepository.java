@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+@Deprecated
 public class CouponInMemoryRepository implements CouponRepository {
     private final Map<Long, CouponEntity> coupons = new ConcurrentHashMap<>();
     private final AtomicLong idGenerator = new AtomicLong(1);

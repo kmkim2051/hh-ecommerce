@@ -41,26 +41,22 @@ import static org.mockito.Mockito.*;
 class OrderServiceIntegrationTest extends TestContainersConfig {
 
     @Autowired
-    private OrderService orderService;
-
+    private OrderCommandService orderCommandService;
+    @Autowired
+    private OrderQueryService orderQueryService;
     @Autowired
     private OrderRepository orderRepository;
-
     @Autowired
     private OrderItemRepository orderItemRepository;
 
     @MockitoBean
     private CartService cartService;
-
     @MockitoBean
     private ProductService productService;
-
     @MockitoBean
     private CouponQueryService couponQueryService;
-
     @MockitoBean
     private CouponCommandService couponCommandService;
-
     @MockitoBean
     private PointService pointService;
 
@@ -80,6 +76,8 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         CartItem cartItem = createCartItem(cartItemId, userId, productId, 2);
         Product product = createProduct(productId, "노트북", BigDecimal.valueOf(1500000), 10);
 
+        when(cartService.getCartItemById(cartItemId)).thenReturn(cartItem);
+
         // CartService.prepareOrderFromCart 모킹
         OrderPreparationResult preparationResult = OrderPreparationResult.of(
                 List.of(cartItem),
@@ -92,12 +90,12 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         when(productService.getProductList(List.of(productId))).thenReturn(List.of(product));
         when(pointService.hasPointAccount(userId)).thenReturn(true);
         when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(5000000)));
-        when(pointService.usePoint(anyLong(), any(BigDecimal.class), anyLong())).thenReturn(null);
+        when(pointService.usePointWithinTransaction(anyLong(), any(BigDecimal.class), anyLong())).thenReturn(null);
         doNothing().when(cartService).completeOrderCheckout(anyLong(), anyList());
 
         CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), null);
 
-        Order createdOrder = orderService.createOrder(userId, command);
+        Order createdOrder = orderCommandService.createOrder(userId, command);
 
         assertThat(createdOrder).isNotNull();
         assertThat(createdOrder.getId()).isNotNull();
@@ -108,7 +106,7 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         assertThat(createdOrder.getFinalAmount()).isEqualTo(BigDecimal.valueOf(3000000));
         assertThat(createdOrder.getOrderItems()).hasSize(1);
 
-        Order retrievedOrder = orderService.getOrder(createdOrder.getId(), userId);
+        Order retrievedOrder = orderQueryService.getOrder(createdOrder.getId(), userId);
 
         assertThat(retrievedOrder.getId()).isEqualTo(createdOrder.getId());
         assertThat(retrievedOrder.getOrderNumber()).isEqualTo(createdOrder.getOrderNumber());
@@ -130,7 +128,8 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         Coupon coupon = createCoupon(couponId, "할인쿠폰", BigDecimal.valueOf(5000));
         CouponUser couponUser = createCouponUser(couponUserId, userId, couponId, false);
 
-        // CartService.prepareOrderFromCart 모킹
+        when(cartService.getCartItemById(cartItemId)).thenReturn(cartItem);
+
         OrderPreparationResult preparationResult = OrderPreparationResult.of(
                 List.of(cartItem),
                 BigDecimal.valueOf(50000),
@@ -146,13 +145,13 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         );
         when(pointService.hasPointAccount(userId)).thenReturn(true);
         when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(100000)));
-        when(pointService.usePoint(anyLong(), any(BigDecimal.class), anyLong())).thenReturn(null);
-        when(couponCommandService.useCoupon(anyLong(), anyLong())).thenReturn(null);
+        when(pointService.usePointWithinTransaction(anyLong(), any(BigDecimal.class), anyLong())).thenReturn(null);
+        when(couponCommandService.useCouponWithinTransaction(anyLong(), anyLong())).thenReturn(null);
         doNothing().when(cartService).completeOrderCheckout(anyLong(), anyList());
 
         CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), couponId);
 
-        Order createdOrder = orderService.createOrder(userId, command);
+        Order createdOrder = orderCommandService.createOrder(userId, command);
 
         assertThat(createdOrder).isNotNull();
         assertThat(createdOrder.getTotalAmount()).isEqualTo(BigDecimal.valueOf(50000));
@@ -161,8 +160,8 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         assertThat(createdOrder.getCouponUserId()).isEqualTo(couponUserId);
         assertThat(createdOrder.getStatus()).isEqualTo(OrderStatus.PAID);
 
-        verify(couponCommandService).useCoupon(couponUserId, createdOrder.getId());
-        verify(pointService).usePoint(userId, BigDecimal.valueOf(45000), createdOrder.getId());
+        verify(couponCommandService).useCouponWithinTransaction(couponUserId, createdOrder.getId());
+        verify(pointService).usePointWithinTransaction(userId, BigDecimal.valueOf(45000), createdOrder.getId());
     }
 
     @Test
@@ -181,12 +180,12 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         CreateOrderCommand command1 = new CreateOrderCommand(List.of(cartItemId1), null);
         CreateOrderCommand command2 = new CreateOrderCommand(List.of(cartItemId2), null);
 
-        orderService.createOrder(user1, command1);
-        orderService.createOrder(user1, command1);
-        orderService.createOrder(user2, command2);
+        orderCommandService.createOrder(user1, command1);
+        orderCommandService.createOrder(user1, command1);
+        orderCommandService.createOrder(user2, command2);
 
-        List<Order> user1Orders = orderService.getOrders(user1);
-        List<Order> user2Orders = orderService.getOrders(user2);
+        List<Order> user1Orders = orderQueryService.getOrders(user1);
+        List<Order> user2Orders = orderQueryService.getOrders(user2);
 
         assertThat(user1Orders).hasSize(2);
         assertThat(user2Orders).hasSize(1);
@@ -204,15 +203,15 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         setupMocksForUser(userId, cartItemId, productId, "상품", BigDecimal.valueOf(10000));
 
         CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), null);
-        Order createdOrder = orderService.createOrder(userId, command);
+        Order createdOrder = orderCommandService.createOrder(userId, command);
 
         assertThat(createdOrder.getStatus()).isEqualTo(OrderStatus.PAID);
 
-        Order completedOrder = orderService.updateOrderStatus(createdOrder.getId(), OrderStatus.COMPLETED);
+        Order completedOrder = orderCommandService.updateOrderStatus(createdOrder.getId(), OrderStatus.COMPLETED);
 
         assertThat(completedOrder.getStatus()).isEqualTo(OrderStatus.COMPLETED);
 
-        Order retrievedOrder = orderService.getOrderById(createdOrder.getId());
+        Order retrievedOrder = orderQueryService.getOrderById(createdOrder.getId());
         assertThat(retrievedOrder.getStatus()).isEqualTo(OrderStatus.COMPLETED);
     }
 
@@ -227,9 +226,9 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         setupMocksForUser(userId, cartItemId, productId, "상품", BigDecimal.valueOf(10000));
 
         CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), null);
-        Order createdOrder = orderService.createOrder(userId, command);
+        Order createdOrder = orderCommandService.createOrder(userId, command);
 
-        assertThatThrownBy(() -> orderService.getOrder(createdOrder.getId(), otherUserId))
+        assertThatThrownBy(() -> orderQueryService.getOrder(createdOrder.getId(), otherUserId))
                 .isInstanceOf(OrderException.class)
                 .extracting(ex -> ((OrderException) ex).getErrorCode())
                 .isEqualTo(OrderErrorCode.UNAUTHORIZED_ORDER_ACCESS);
@@ -241,12 +240,12 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         Long userId = 1L;
         CreateOrderCommand command = new CreateOrderCommand(List.of(), null);
 
-        assertThatThrownBy(() -> orderService.createOrder(userId, command))
+        assertThatThrownBy(() -> orderCommandService.createOrder(userId, command))
                 .isInstanceOf(OrderException.class)
                 .extracting(ex -> ((OrderException) ex).getErrorCode())
                 .isEqualTo(OrderErrorCode.EMPTY_ORDER_CART_ITEM);
 
-        List<Order> orders = orderService.getOrders(userId);
+        List<Order> orders = orderQueryService.getOrders(userId);
         assertThat(orders).isEmpty();
     }
 
@@ -260,7 +259,8 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         CartItem cartItem = createCartItem(cartItemId, userId, productId, 1);
         Product product = createProduct(productId, "고가상품", BigDecimal.valueOf(1000000), 10);
 
-        // CartService.prepareOrderFromCart 모킹
+        when(cartService.getCartItemById(cartItemId)).thenReturn(cartItem);
+
         OrderPreparationResult preparationResult = OrderPreparationResult.of(
                 List.of(cartItem),
                 BigDecimal.valueOf(1000000),
@@ -275,11 +275,11 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
 
         CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), null);
 
-        assertThatThrownBy(() -> orderService.createOrder(userId, command))
+        assertThatThrownBy(() -> orderCommandService.createOrder(userId, command))
                 .isInstanceOf(OrderException.class)
                 .hasMessageContaining("포인트 잔액이 부족합니다");
 
-        List<Order> orders = orderService.getOrders(userId);
+        List<Order> orders = orderQueryService.getOrders(userId);
         assertThat(orders).isEmpty();
     }
 
@@ -290,6 +290,10 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         Long cartItemId = 100L;
         Long productId = 1000L;
 
+        // CartService.getCartItemById 모킹 (extractProductIdsFromCart에서 사용)
+        CartItem cartItem = createCartItem(cartItemId, userId, productId, 1);
+        when(cartService.getCartItemById(cartItemId)).thenReturn(cartItem);
+
         // prepareOrderFromCart에서 재고 부족 예외 발생
         when(cartService.prepareOrderFromCart(userId, List.of(cartItemId)))
                 .thenThrow(new OrderException(OrderErrorCode.INVALID_ORDER_STATUS, "재고가 부족합니다"));
@@ -297,11 +301,11 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
 
         CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), null);
 
-        assertThatThrownBy(() -> orderService.createOrder(userId, command))
+        assertThatThrownBy(() -> orderCommandService.createOrder(userId, command))
                 .isInstanceOf(OrderException.class)
                 .hasMessageContaining("재고가 부족합니다");
 
-        List<Order> orders = orderService.getOrders(userId);
+        List<Order> orders = orderQueryService.getOrders(userId);
         assertThat(orders).isEmpty();
     }
 
@@ -316,9 +320,9 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
 
         CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), null);
 
-        Order order1 = orderService.createOrder(userId, command);
+        Order order1 = orderCommandService.createOrder(userId, command);
         Thread.sleep(2);
-        Order order2 = orderService.createOrder(userId, command);
+        Order order2 = orderCommandService.createOrder(userId, command);
 
         assertThat(order1.getOrderNumber()).isNotEqualTo(order2.getOrderNumber());
         assertThat(order1.getId()).isNotEqualTo(order2.getId());
@@ -338,6 +342,10 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         Product product1 = createProduct(productId1, "노트북", BigDecimal.valueOf(1500000), 10);
         Product product2 = createProduct(productId2, "마우스", BigDecimal.valueOf(50000), 20);
 
+        // CartService.getCartItemById 모킹 (extractProductIdsFromCart에서 사용)
+        when(cartService.getCartItemById(cartItemId1)).thenReturn(cartItem1);
+        when(cartService.getCartItemById(cartItemId2)).thenReturn(cartItem2);
+
         // CartService.prepareOrderFromCart 모킹
         OrderPreparationResult preparationResult = OrderPreparationResult.of(
                 List.of(cartItem1, cartItem2),
@@ -351,12 +359,12 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
                 .thenReturn(List.of(product1, product2));
         when(pointService.hasPointAccount(userId)).thenReturn(true);
         when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(5000000)));
-        when(pointService.usePoint(anyLong(), any(BigDecimal.class), anyLong())).thenReturn(null);
+        when(pointService.usePointWithinTransaction(anyLong(), any(BigDecimal.class), anyLong())).thenReturn(null);
         doNothing().when(cartService).completeOrderCheckout(anyLong(), anyList());
 
         CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId1, cartItemId2), null);
 
-        Order createdOrder = orderService.createOrder(userId, command);
+        Order createdOrder = orderCommandService.createOrder(userId, command);
 
         assertThat(createdOrder.getOrderItems()).hasSize(2);
         assertThat(createdOrder.getTotalAmount()).isEqualTo(BigDecimal.valueOf(3050000));
@@ -375,7 +383,8 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         CartItem cartItem = createCartItem(cartItemId, userId, productId, 1);
         Product product = createProduct(productId, productName, price, 100);
 
-        // CartService.prepareOrderFromCart 모킹
+        lenient().when(cartService.getCartItemById(cartItemId)).thenReturn(cartItem);
+
         OrderPreparationResult preparationResult = OrderPreparationResult.of(
                 List.of(cartItem),
                 price,
@@ -387,7 +396,7 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         lenient().when(productService.getProductList(List.of(productId))).thenReturn(List.of(product));
         lenient().when(pointService.hasPointAccount(userId)).thenReturn(true);
         lenient().when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(10000000)));
-        lenient().when(pointService.usePoint(anyLong(), any(BigDecimal.class), anyLong())).thenReturn(null);
+        lenient().when(pointService.usePointWithinTransaction(anyLong(), any(BigDecimal.class), anyLong())).thenReturn(null);
         lenient().doNothing().when(cartService).completeOrderCheckout(anyLong(), anyList());
     }
 

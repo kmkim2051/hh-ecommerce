@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+@Deprecated
 public class PointInMemoryRepository implements PointRepository {
     private final Map<Long, PointEntity> points = new ConcurrentHashMap<>();
     private final Map<Long, Long> userIdToPointId = new ConcurrentHashMap<>(); // userId -> pointId 매핑

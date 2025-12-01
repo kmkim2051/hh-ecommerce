@@ -23,15 +23,12 @@ public class OrderRepositoryImpl implements OrderRepository {
         OrderEntity savedEntity;
 
         if (order.getId() == null) {
-            // 새로운 엔티티 생성 (id와 version은 JPA가 자동 생성)
             OrderEntity entity = OrderEntity.from(order);
             savedEntity = orderJpaRepository.save(entity);
         } else {
-            // 기존 엔티티 업데이트 - 기존 엔티티를 조회해서 version 유지
             OrderEntity existingEntity = orderJpaRepository.findById(order.getId())
                     .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND, order.getId()));
 
-            // 기존 version과 createdAt을 유지하면서 새로운 엔티티 생성
             OrderEntity updatedEntity = OrderEntity.builder()
                     .id(existingEntity.getId())
                     .orderNumber(order.getOrderNumber())
@@ -80,7 +77,7 @@ public class OrderRepositoryImpl implements OrderRepository {
                 .map(OrderEntity::toDomain);
     }
 
-    // for only testing
+    // for !! only testing !!
     @Override
     public void deleteAll() {
         orderJpaRepository.deleteAll();

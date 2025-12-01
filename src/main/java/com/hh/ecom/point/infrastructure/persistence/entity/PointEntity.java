@@ -39,16 +39,12 @@ public class PointEntity {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @Version
-    private Long version;
-
     public Point toDomain() {
         return Point.builder()
                 .id(this.id)
                 .userId(this.userId)
                 .balance(this.balance)
                 .updatedAt(this.updatedAt)
-                .version(this.version)
                 .build();
     }
 
@@ -57,12 +53,6 @@ public class PointEntity {
                 .id(point.getId())
                 .userId(point.getUserId())
                 .balance(point.getBalance())
-                .version(point.getVersion())
                 .build();
-    }
-
-    public void updateFrom(Point point) {
-        this.userId = point.getUserId();
-        this.balance = point.getBalance();
     }
 }

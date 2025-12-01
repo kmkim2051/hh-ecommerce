@@ -1,6 +1,7 @@
 package com.hh.ecom.order.presentation;
 
-import com.hh.ecom.order.application.OrderService;
+import com.hh.ecom.order.application.OrderCommandService;
+import com.hh.ecom.order.application.OrderQueryService;
 import com.hh.ecom.order.domain.Order;
 import com.hh.ecom.order.presentation.api.OrderApi;
 import com.hh.ecom.order.presentation.dto.response.OrderListResponse;
@@ -17,7 +18,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class OrderController implements OrderApi {
 
-    private final OrderService orderService;
+    private final OrderCommandService orderCommandService;
+    private final OrderQueryService orderQueryService;
 
     @Override
     @PostMapping
@@ -25,7 +27,7 @@ public class OrderController implements OrderApi {
             @RequestHeader("userId") Long userId,
             @RequestBody CreateOrderRequest request
     ) {
-        Order order = orderService.createOrder(userId, request.toCommand());
+        Order order = orderCommandService.createOrder(userId, request.toCommand());
         OrderResponse response = OrderResponse.from(order);
         return ResponseEntity.ok(response);
     }
@@ -35,7 +37,7 @@ public class OrderController implements OrderApi {
     public ResponseEntity<OrderListResponse> getOrders(
             @RequestHeader("userId") Long userId
     ) {
-        List<Order> orders = orderService.getOrders(userId);
+        List<Order> orders = orderQueryService.getOrders(userId);
         OrderListResponse response = OrderListResponse.from(orders);
         return ResponseEntity.ok(response);
     }
@@ -46,7 +48,7 @@ public class OrderController implements OrderApi {
             @RequestHeader("userId") Long userId,
             @PathVariable Long id
     ) {
-        Order order = orderService.getOrder(id, userId);
+        Order order = orderQueryService.getOrder(id, userId);
         OrderResponse response = OrderResponse.from(order);
         return ResponseEntity.ok(response);
     }
