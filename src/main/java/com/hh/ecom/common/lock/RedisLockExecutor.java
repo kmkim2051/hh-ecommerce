@@ -13,8 +13,15 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 /**
- * Redis 기반 분산 락 실행기 (Spin Lock 방식)
+ * Redis 기반 분산 락 실행기 (Reentrant + Spin Lock 방식)
  * 여러 개의 락 키를 동시에 획득하고, 비즈니스 로직 실행 후 자동으로 해제합니다.
+ *
+ * <p>특징:
+ * <ul>
+ *   <li>Reentrant 지원: 같은 스레드에서 동일 락을 여러 번 획득 가능</li>
+ *   <li>데드락 방지: 정렬된 락 키 순서로 획득</li>
+ *   <li>자동 해제: 예외 발생 시에도 finally 블록에서 락 해제</li>
+ * </ul>
  *
  * 사용 예시:
  * <pre>
@@ -110,17 +117,42 @@ public class RedisLockExecutor {
     }
 
     /**
-     * Spin Lock 방식으로 락 획득 시도
+     * Reentrant + Spin Lock 방식으로 락 획득 시도
+     *
+     * <p>동작 방식:
+     * 1. 현재 스레드가 이미 락을 보유한 경우 → 즉시 재진입 (Reentrant)
+     * 2. 그렇지 않으면 Spin Lock으로 반복 시도
+     *
+     * <p>Reentrant 세부 사항:
+     * - Redisson은 Thread ID 기반으로 재진입 판단 (UUID:threadId)
+     * - 재진입 횟수를 Redis Hash에 count로 관리
+     * - 재진입 시마다 TTL 갱신 (lease time 연장)
      */
     private boolean acquireLockWithSpinning(RLock lock, String lockKey,
                                             long waitTime, long leaseTime,
                                             long startTime) {
+        // 1. Reentrant 체크: 이미 현재 스레드가 락을 보유한 경우
+        if (lock.isHeldByCurrentThread()) {
+            try {
+                // 재진입 허용: count 증가 + TTL 갱신
+                lock.lock(leaseTime, TimeUnit.MILLISECONDS);
+                log.debug("락 재진입 성공 (Reentrant): key={}, holdCount={}",
+                    lockKey, lock.getHoldCount());
+                return true;
+            } catch (Exception e) {
+                log.error("락 재진입 실패: key={}, error={}", lockKey, e.getMessage());
+                return false;
+            }
+        }
+
+        // 2. Spin Lock: 새로운 락 획득 시도
         long deadline = startTime + waitTime;
 
         while (System.currentTimeMillis() < deadline) {
             try {
                 boolean acquired = lock.tryLock(0, leaseTime, TimeUnit.MILLISECONDS);
                 if (acquired) {
+                    log.debug("락 획득 성공: key={}, holdCount={}", lockKey, lock.getHoldCount());
                     return true;
                 }
                 Thread.sleep(SPIN_LOCK_RETRY_INTERVAL_MS);

@@ -3,7 +3,7 @@ package com.hh.ecom.order.application;
 import com.hh.ecom.cart.application.CartService;
 import com.hh.ecom.cart.application.dto.OrderPreparationResult;
 import com.hh.ecom.cart.domain.CartItem;
-import com.hh.ecom.common.lock.LockKeyGenerator;
+import com.hh.ecom.common.lock.OrderLockContext;
 import com.hh.ecom.common.lock.RedisLockExecutor;
 import com.hh.ecom.coupon.application.CouponCommandService;
 import com.hh.ecom.coupon.application.CouponQueryService;
@@ -43,7 +43,6 @@ public class OrderCommandService {
     private final CouponCommandService couponCommandService;
     private final PointService pointService;
     private final RedisLockExecutor redisLockExecutor;
-    private final LockKeyGenerator lockKeyGenerator;
     private final TransactionTemplate transactionTemplate;
 
     public Order createOrder(Long userId, CreateOrderCommand createOrderCommand) {
@@ -57,7 +56,11 @@ public class OrderCommandService {
         Long couponUserId = extractCouponUserId(userId, createOrderCommand.couponId());
 
         // 주문 내부 분산락 필요 도메인: [Product, Point, Coupon]
-        List<String> lockKeys = lockKeyGenerator.generateOrderLockKeys(userId, productIds, couponUserId);
+        List<String> lockKeys = new OrderLockContext()
+            .withUserPoint(userId)
+            .withProducts(productIds)
+            .withCoupon(couponUserId)
+            .buildSortedLockKeys();
         log.debug("분산락 키 생성 완료: keys={}", lockKeys);
 
         return redisLockExecutor.executeWithLock(lockKeys, () ->
@@ -189,12 +192,16 @@ public class OrderCommandService {
 
     private void useCoupon(Long couponUserId, Order savedOrder) {
         if (couponUserId != null) {
-            couponCommandService.useCouponWithinTransaction(couponUserId, savedOrder.getId());
+            // Reentrant Lock 덕분에 독립적인 useCoupon() 메서드 호출 가능
+            // OrderService가 이미 락을 보유한 상태지만, 같은 스레드에서 재진입 허용됨
+            couponCommandService.useCoupon(couponUserId, savedOrder.getId());
         }
     }
 
     private void usePoint(Long userId, BigDecimal finalAmount, Order savedOrder) {
-        pointService.usePointWithinTransaction(userId, finalAmount, savedOrder.getId());
+        // Reentrant Lock 덕분에 독립적인 usePoint() 메서드 호출 가능
+        // OrderService가 이미 락을 보유한 상태지만, 같은 스레드에서 재진입 허용됨
+        pointService.usePoint(userId, finalAmount, savedOrder.getId());
     }
 
     private void decreaseProductStockInCart(List<CartItem> cartItems, Map<Long, Product> productMap) {

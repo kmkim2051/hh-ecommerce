@@ -32,14 +32,14 @@ public class RedisViewCountRepository implements ViewCountRepository {
     private static final int MAX_BUFFER_THRESHOLD = 10;
 
     private final RedisTemplate<String, Long> redisTemplate;
-    private final RedisTemplate<String, String> viewHistoryRedisTemplate;
+    private final RedisTemplate<String, String> customStringRedisTemplate;
 
     public RedisViewCountRepository(
             RedisTemplate<String, Long> redisTemplate,
-            @Qualifier("viewHistoryRedisTemplate") RedisTemplate<String, String> viewHistoryRedisTemplate
+            @Qualifier("customStringRedisTemplate") RedisTemplate<String, String> customStringRedisTemplate
     ) {
         this.redisTemplate = redisTemplate;
-        this.viewHistoryRedisTemplate = viewHistoryRedisTemplate;
+        this.customStringRedisTemplate = customStringRedisTemplate;
     }
 
     @Override
@@ -77,8 +77,8 @@ public class RedisViewCountRepository implements ViewCountRepository {
     }
 
     private void incrementScoreWithTTL(String key, String member, int count, long ttlSeconds) {
-        viewHistoryRedisTemplate.opsForZSet().incrementScore(key, member, count);
-        viewHistoryRedisTemplate.expire(key, ttlSeconds, TimeUnit.SECONDS);
+        customStringRedisTemplate.opsForZSet().incrementScore(key, member, count);
+        customStringRedisTemplate.expire(key, ttlSeconds, TimeUnit.SECONDS);
     }
 
     @Override
@@ -132,7 +132,7 @@ public class RedisViewCountRepository implements ViewCountRepository {
         }
 
         // Sorted Set에서 score 내림차순으로 상위 N개 조회
-        Set<String> topMembers = viewHistoryRedisTemplate.opsForZSet()
+        Set<String> topMembers = customStringRedisTemplate.opsForZSet()
                 .reverseRange(key, 0, limit - 1);
 
         if (topMembers == null || topMembers.isEmpty()) {
