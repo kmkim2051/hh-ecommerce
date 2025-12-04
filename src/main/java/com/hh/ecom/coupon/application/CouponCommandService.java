@@ -19,6 +19,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 
+// DB 기반 쿠폰 관리 서비스
 @Slf4j
 @Service
 @RequiredArgsConstructor
