@@ -26,6 +26,7 @@ public class SalesRankingRedisRepository {
     }
 
     private static final int DAILY_KEY_TTL_DAYS = 30;
+    private static final Duration DAILY_KEY_TIMEOUT = Duration.ofDays(DAILY_KEY_TTL_DAYS);
 
     /**
      * 판매량 증가 (원자적 연산)
@@ -59,7 +60,7 @@ public class SalesRankingRedisRepository {
             redisTemplate.opsForZSet().incrementScore(dailyKey, productIdStr, quantity);
 
             // 일별 키는 TTL 설정 (30일 후 자동 삭제)
-            redisTemplate.expire(dailyKey, Duration.ofDays(DAILY_KEY_TTL_DAYS));
+            redisTemplate.expire(dailyKey, DAILY_KEY_TIMEOUT);
 
             log.debug("판매량 증가 완료: productId={}, quantity={}, date={}", productId, quantity, date);
         } catch (Exception e) {
@@ -195,7 +196,7 @@ public class SalesRankingRedisRepository {
 
         try {
             Boolean added = redisTemplate.opsForValue()
-                    .setIfAbsent(recordedKey, "1", Duration.ofDays(DAILY_KEY_TTL_DAYS));
+                    .setIfAbsent(recordedKey, "1", DAILY_KEY_TIMEOUT);
             boolean isNew = Boolean.TRUE.equals(added);
 
             if (isNew) {

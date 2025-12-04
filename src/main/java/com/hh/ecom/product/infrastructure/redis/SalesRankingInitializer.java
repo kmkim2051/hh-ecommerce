@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * 애플리케이션 시작 시 Redis 판매 랭킹 초기화
- * - RedisSalesRankingService가 활성화된 경우에만 동작
+ * - RedisSalesRankingRepository가 활성화된 경우에만 동작
  * - DB의 COMPLETED 주문 데이터를 Redis로 동기화
  * - 전체 기간 + 최근 30일 데이터 초기화
  */
@@ -18,13 +18,13 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @ConditionalOnBean(RedisSalesRankingRepository.class)
 public class SalesRankingInitializer implements ApplicationRunner {
-    private final RedisSalesRankingRepository redisSalesRankingService;
+    private final RedisSalesRankingRepository redisSalesRankingRepository;
 
     @Override
     public void run(ApplicationArguments args) {
         try {
             log.info("=== Redis 판매 랭킹 초기화 시작 ===");
-            redisSalesRankingService.initializeFromDatabase();
+            redisSalesRankingRepository.initializeFromDatabase();
             log.info("=== Redis 판매 랭킹 초기화 완료 ===");
         } catch (Exception e) {
             log.error("Redis 판매 랭킹 초기화 실패: {}", e.getMessage(), e);
