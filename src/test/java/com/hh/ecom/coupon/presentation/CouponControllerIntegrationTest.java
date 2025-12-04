@@ -3,6 +3,7 @@ package com.hh.ecom.coupon.presentation;
 import com.hh.ecom.config.TestContainersConfig;
 import com.hh.ecom.coupon.application.CouponCommandService;
 import com.hh.ecom.coupon.application.CouponQueryService;
+import com.hh.ecom.coupon.application.RedisCouponService;
 import com.hh.ecom.coupon.domain.Coupon;
 import com.hh.ecom.coupon.domain.CouponRepository;
 import com.hh.ecom.coupon.domain.CouponUser;
@@ -11,11 +12,14 @@ import com.hh.ecom.coupon.domain.exception.CouponException;
 import com.hh.ecom.coupon.presentation.dto.response.CouponIssueResponse;
 import com.hh.ecom.coupon.presentation.dto.response.CouponListResponse;
 import com.hh.ecom.coupon.presentation.dto.response.MyCouponListResponse;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
@@ -34,10 +38,17 @@ class CouponControllerIntegrationTest extends TestContainersConfig {
     private CouponCommandService couponCommandService;
 
     @Autowired
+    private RedisCouponService redisCouponService;
+
+    @Autowired
     private CouponRepository couponRepository;
 
     @Autowired
     private CouponUserRepository couponUserRepository;
+
+    @Autowired
+    @Qualifier("customStringRedisTemplate")
+    private RedisTemplate<String, String> redisTemplate;
 
     private CouponController couponController;
     private Coupon testCoupon;
@@ -45,7 +56,7 @@ class CouponControllerIntegrationTest extends TestContainersConfig {
 
     @BeforeEach
     void setUp() {
-        couponController = new CouponController(couponQueryService, couponCommandService);
+        couponController = new CouponController(couponQueryService, redisCouponService);
 
         couponUserRepository.deleteAll();
         couponRepository.deleteAll();
@@ -59,6 +70,18 @@ class CouponControllerIntegrationTest extends TestContainersConfig {
                 LocalDateTime.now().plusDays(30)
         );
         testCoupon = couponRepository.save(testCoupon);
+
+        redisCouponService.initializeCouponStock(testCoupon.getId(), testCoupon.getAvailableQuantity());
+    }
+
+    @AfterEach
+    void tearDown() {
+        // Clean up Redis keys
+        if (testCoupon != null && testCoupon.getId() != null) {
+            redisTemplate.delete("coupon:issue:async:stock:" + testCoupon.getId());
+            redisTemplate.delete("coupon:issue:async:participants:" + testCoupon.getId());
+            redisTemplate.delete("coupon:issue:async:queue:" + testCoupon.getId());
+        }
     }
 
     @Test
@@ -77,34 +100,39 @@ class CouponControllerIntegrationTest extends TestContainersConfig {
     }
 
     @Test
-    @DisplayName("쿠폰을 성공적으로 발급받는다")
+    @DisplayName("쿠폰을 성공적으로 발급받는다 (비동기 큐 등록)")
     void issueCoupon_Success() {
         // when
         ResponseEntity<CouponIssueResponse> response = couponController.issueCoupon(testUserId, testCoupon.getId());
 
-        // then
+        // then - 비동기 플로우이므로 즉시 QUEUED 응답
         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().message()).isEqualTo("쿠폰이 발급되었습니다.");
-        assertThat(response.getBody().couponName()).isEqualTo("테스트 쿠폰");
-        assertThat(response.getBody().discountAmount()).isEqualByComparingTo(BigDecimal.valueOf(5000));
+        assertThat(response.getBody().status()).isEqualTo("QUEUED");
+        assertThat(response.getBody().message()).isEqualTo("쿠폰 발급 요청이 접수되었습니다. 곧 처리됩니다.");
+        assertThat(response.getBody().userId()).isEqualTo(testUserId);
+        assertThat(response.getBody().couponId()).isEqualTo(testCoupon.getId());
+
+        // Verify the request was added to the queue
+        Long queueSize = redisCouponService.getQueueSize(testCoupon.getId());
+        assertThat(queueSize).isGreaterThan(0L);
     }
 
     @Test
-    @DisplayName("이미 발급받은 쿠폰을 다시 발급받으려고 하면 실패한다")
+    @DisplayName("이미 발급받은 쿠폰을 다시 발급받으려고 하면 실패한다 (Redis 중복 체크)")
     void issueCoupon_AlreadyIssued() {
-        // given
-        couponCommandService.issueCoupon(testUserId, testCoupon.getId());
+        // given - 첫 번째 요청
+        couponController.issueCoupon(testUserId, testCoupon.getId());
 
-        // when & then
+        // when & then - 중복 요청 시도
         assertThatThrownBy(() -> couponController.issueCoupon(testUserId, testCoupon.getId()))
                 .isInstanceOf(CouponException.class);
     }
 
     @Test
-    @DisplayName("수량이 소진된 쿠폰은 발급받을 수 없다")
+    @DisplayName("수량이 소진된 쿠폰은 발급받을 수 없다 (Redis 재고 체크)")
     void issueCoupon_OutOfStock() {
-        // given - 쿠폰 수량을 모두 소진
+        // given - 수량이 1개인 쿠폰 생성
         Coupon soldOutCoupon = Coupon.create(
                 "품절 쿠폰",
                 BigDecimal.valueOf(3000),
@@ -114,12 +142,20 @@ class CouponControllerIntegrationTest extends TestContainersConfig {
         );
         final Coupon finalSoldOutCoupon = couponRepository.save(soldOutCoupon);
 
-        // 첫 번째 사용자가 발급받음
-        couponCommandService.issueCoupon(999L, finalSoldOutCoupon.getId());
+        // Initialize Redis stock
+        redisCouponService.initializeCouponStock(finalSoldOutCoupon.getId(), finalSoldOutCoupon.getAvailableQuantity());
 
-        // when & then - 두 번째 사용자가 발급 시도
+        // 첫 번째 사용자가 발급받음 (큐에 등록)
+        couponController.issueCoupon(999L, finalSoldOutCoupon.getId());
+
+        // when & then - 두 번째 사용자가 발급 시도 (재고 소진으로 실패)
         assertThatThrownBy(() -> couponController.issueCoupon(testUserId, finalSoldOutCoupon.getId()))
                 .isInstanceOf(CouponException.class);
+
+        // cleanup Redis keys
+        redisTemplate.delete("coupon:issue:async:stock:" + finalSoldOutCoupon.getId());
+        redisTemplate.delete("coupon:issue:async:participants:" + finalSoldOutCoupon.getId());
+        redisTemplate.delete("coupon:issue:async:queue:" + finalSoldOutCoupon.getId());
     }
 
     @Test
