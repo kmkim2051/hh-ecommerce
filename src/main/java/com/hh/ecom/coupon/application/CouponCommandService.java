@@ -32,6 +32,7 @@ public class CouponCommandService {
 
     private final TransactionTemplate transactionTemplate;
 
+    @Deprecated
     public CouponUser issueCoupon(Long userId, Long couponId) {
         final String lockKey = SimpleLockResource.of(LockDomain.COUPON_ISSUE, couponId).getLockKey();
         log.debug("쿠폰 발급 락 획득 시도: lockKey={}, userId={}, couponId={}", lockKey, userId, couponId);
