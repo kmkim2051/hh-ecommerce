@@ -1,5 +1,6 @@
 package com.hh.ecom.product.application;
 
+import com.hh.ecom.order.domain.OrderItem;
 import com.hh.ecom.product.domain.Product;
 import com.hh.ecom.product.domain.ProductRepository;
 import com.hh.ecom.product.domain.ViewCountRepository;
@@ -14,17 +15,22 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+/**
+ * 상품 서비스
+ * - 상품 조회 및 재고 관리만 담당
+ */
 @Service
+@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class ProductService {
     private final ProductRepository productRepository;
     private final ViewCountRepository viewCountRepository;
+    private final SalesRankingRepository salesRankingRepository;
 
     public Page<Product> getProductList(Pageable pageable) {
         return productRepository.findAll(pageable);
     }
 
-    @Transactional(readOnly = true)
     public Product getProduct(Long id) {
         Product product = findProductById(id);
         viewCountRepository.incrementViewCount(id);
@@ -39,27 +45,27 @@ public class ProductService {
         return findProductById(id);
     }
 
-    public List<Product> getProductsByViewCount(Integer limit) {
-        return productRepository.findTopByViewCount(limit);
-    }
-
-    public List<Product> getProductsByViewCountInRecentDays(Integer days, Integer limit) {
-        return productRepository.findTopByViewCountInRecentDays(days, limit);
-    }
-
-    public List<Product> getProductsBySalesCount(Integer limit) {
-        return productRepository.findTopBySalesCount(limit);
-    }
-
-    public List<Product> getProductsBySalesCountInRecentDays(Integer days, Integer limit) {
-        return productRepository.findTopBySalesCountInRecentDays(days, limit);
-    }
-
     @Transactional
     public void decreaseProductStock(Long productId, Integer quantity) {
         Product product = findProductById(productId);
         Product decreased = product.decreaseStock(quantity);
         productRepository.save(decreased);
+    }
+
+    public List<Product> getTopBySalesCount(int limit) {
+        return salesRankingRepository.getTopBySalesCount(limit);
+    }
+
+    public List<Product> getTopBySalesCountInRecentDays(int days, int limit) {
+        return salesRankingRepository.getTopBySalesCountInRecentDays(days, limit);
+    }
+
+    public List<Product> getTopByViewCount(Integer limit) {
+        return productRepository.findTopByViewCount(limit);
+    }
+
+    public List<Product> getTopByViewCountInRecentDays(Integer days, Integer limit) {
+        return productRepository.findTopByViewCountInRecentDays(days, limit);
     }
 
     private Product findProductById(Long id) {
