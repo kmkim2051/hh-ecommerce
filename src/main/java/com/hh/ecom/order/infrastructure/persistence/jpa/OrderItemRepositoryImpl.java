@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -62,6 +63,26 @@ public class OrderItemRepositoryImpl implements OrderItemRepository {
     @Override
     public List<ProductSalesCount> findTopProductsBySalesCount(int limit) {
         return orderItemJpaRepository.findTopProductsBySalesCount(limit).stream()
+                .map(projection -> ProductSalesCount.of(
+                        projection.getProductId(),
+                        projection.getSalesCount()
+                ))
+                .toList();
+    }
+
+    @Override
+    public List<ProductSalesCount> findAllProductSalesCount() {
+        return orderItemJpaRepository.findAllProductSalesCount().stream()
+                .map(projection -> ProductSalesCount.of(
+                        projection.getProductId(),
+                        projection.getSalesCount()
+                ))
+                .toList();
+    }
+
+    @Override
+    public List<ProductSalesCount> findProductSalesCountByDate(LocalDate date) {
+        return orderItemJpaRepository.findProductSalesCountByDate(date).stream()
                 .map(projection -> ProductSalesCount.of(
                         projection.getProductId(),
                         projection.getSalesCount()
