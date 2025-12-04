@@ -31,27 +31,30 @@ public class PointService {
     private final LockKeyGenerator lockKeyGenerator;
     private final TransactionTemplate transactionTemplate;
 
-    @Transactional(propagation = Propagation.MANDATORY)
-    public Point usePointWithinTransaction(Long userId, BigDecimal amount, Long orderId) {
-        return executeUsePoint(userId, amount, orderId);
-    }
+    public Point usePoint(Long userId, BigDecimal amount, Long orderId) {
+        String lockKey = lockKeyGenerator.generatePointLockKey(userId);
 
-    private Point executeUsePoint(Long userId, BigDecimal amount, Long orderId) {
-        Point point = findPointByUserId(userId);
+        log.debug("포인트 사용 락 획득 시도: lockKey={}, userId={}, amount={}", lockKey, userId, amount);
 
-        Point usedPoint = point.use(amount);
-        Point savedPoint = pointRepository.save(usedPoint);
+        return redisLockExecutor.executeWithLock(List.of(lockKey), () ->
+            transactionTemplate.execute(status -> {
+                Point point = findPointByUserId(userId);
 
-        savePointTransaction(PointTransactionCommand.builder()
-                .pointId(savedPoint.getId())
-                .amount(amount)
-                .transactionType(TransactionType.USE)
-                .orderId(orderId)
-                .balanceAfter(savedPoint.getBalance())
-                .build());
+                Point usedPoint = point.use(amount);
+                Point savedPoint = pointRepository.save(usedPoint);
 
-        log.debug("포인트 사용 완료: userId={}, amount={}, orderId={}, balance={}", userId, amount, orderId, savedPoint.getBalance());
-        return savedPoint;
+                savePointTransaction(PointTransactionCommand.builder()
+                        .pointId(savedPoint.getId())
+                        .amount(amount)
+                        .transactionType(TransactionType.USE)
+                        .orderId(orderId)
+                        .balanceAfter(savedPoint.getBalance())
+                        .build());
+
+                log.info("포인트 사용 완료: userId={}, amount={}, orderId={}, balance={}", userId, amount, orderId, savedPoint.getBalance());
+                return savedPoint;
+            })
+        );
     }
 
     public Point refundPoint(Long userId, BigDecimal amount, Long orderId) {

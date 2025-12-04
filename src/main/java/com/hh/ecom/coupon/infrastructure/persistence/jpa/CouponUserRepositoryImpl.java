@@ -6,7 +6,6 @@ import com.hh.ecom.coupon.domain.exception.CouponErrorCode;
 import com.hh.ecom.coupon.domain.exception.CouponException;
 import com.hh.ecom.coupon.infrastructure.persistence.entity.CouponUserEntity;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -14,7 +13,6 @@ import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
-@Primary
 public class CouponUserRepositoryImpl implements CouponUserRepository {
 
     private final CouponUserJpaRepository couponUserJpaRepository;

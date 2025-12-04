@@ -1,14 +1,14 @@
 package com.hh.ecom.coupon.presentation;
 
-import com.hh.ecom.coupon.application.CouponCommandService;
 import com.hh.ecom.coupon.application.CouponQueryService;
+import com.hh.ecom.coupon.application.RedisCouponService;
 import com.hh.ecom.coupon.domain.Coupon;
-import com.hh.ecom.coupon.domain.CouponUser;
 import com.hh.ecom.coupon.domain.CouponUserWithCoupon;
 import com.hh.ecom.coupon.presentation.api.CouponApi;
 import com.hh.ecom.coupon.presentation.dto.response.CouponIssueResponse;
 import com.hh.ecom.coupon.presentation.dto.response.CouponListResponse;
 import com.hh.ecom.coupon.presentation.dto.response.MyCouponListResponse;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +21,7 @@ import java.util.List;
 public class CouponController implements CouponApi {
 
     private final CouponQueryService couponQueryService;
-    private final CouponCommandService couponCommandService;
+    private final RedisCouponService redisCouponService;
 
     @Override
     @GetMapping
@@ -37,13 +37,12 @@ public class CouponController implements CouponApi {
             @RequestHeader("userId") Long userId,
             @PathVariable Long couponId
     ) {
-        CouponUser issuedCouponUser = couponCommandService.issueCoupon(userId, couponId);
-        Coupon coupon = couponQueryService.getCoupon(couponId);
-
-        CouponIssueResponse response = CouponIssueResponse.from(
-                issuedCouponUser,
-                coupon,
-                "쿠폰이 발급되었습니다."
+        redisCouponService.enqueueUserIfEligible(userId, couponId);
+        // 비동기 즉시 응답
+        CouponIssueResponse response = CouponIssueResponse.queued(
+                userId,
+                couponId,
+                "쿠폰 발급 요청이 접수되었습니다. 곧 처리됩니다."
         );
 
         return ResponseEntity.ok(response);

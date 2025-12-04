@@ -2,12 +2,15 @@ package com.hh.ecom.coupon.domain;
 
 import com.hh.ecom.coupon.domain.exception.CouponErrorCode;
 import com.hh.ecom.coupon.domain.exception.CouponException;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+
+import static java.util.Objects.*;
 
 @Getter
 @Builder(toBuilder = true)
@@ -23,15 +26,9 @@ public class CouponUser {
     private final boolean isUsed;
 
     public static CouponUser issue(Long userId, Long couponId, LocalDateTime expireDate) {
-        if (userId == null) {
-            throw new CouponException(CouponErrorCode.INVALID_QUANTITY, "사용자 ID는 필수입니다.");
-        }
-        if (couponId == null) {
-            throw new CouponException(CouponErrorCode.INVALID_QUANTITY, "쿠폰 ID는 필수입니다.");
-        }
-        if (expireDate == null) {
-            throw new CouponException(CouponErrorCode.INVALID_QUANTITY, "만료일은 필수입니다.");
-        }
+        requireNonNull(userId, "userId is required");
+        requireNonNull(couponId, "couponId is required");
+        requireNonNull(expireDate, "expireDate is required");
 
         LocalDateTime now = LocalDateTime.now();
         return CouponUser.builder()
@@ -65,18 +62,6 @@ public class CouponUser {
                 .orderId(orderId)
                 .usedAt(LocalDateTime.now())
                 .isUsed(true)
-                .build();
-    }
-
-    public CouponUser cancelUsage() {
-        if (!isUsed) {
-            throw new CouponException(CouponErrorCode.INVALID_QUANTITY, "사용되지 않은 쿠폰입니다.");
-        }
-
-        return this.toBuilder()
-                .orderId(null)
-                .usedAt(null)
-                .isUsed(false)
                 .build();
     }
 

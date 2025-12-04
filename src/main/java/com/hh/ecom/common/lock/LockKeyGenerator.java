@@ -23,7 +23,9 @@ public class LockKeyGenerator {
      * @param productIds 상품 ID 리스트
      * @param couponUserId 쿠폰 유저 ID (nullable - 쿠폰을 사용하지 않는 경우)
      * @return 정렬된 락 키 리스트 (정렬: default 오름차순)
+     * @deprecated OrderLockContext를 사용하세요
      */
+    @Deprecated
     public List<String> generateOrderLockKeys(Long userId, List<Long> productIds, Long couponUserId) {
         List<String> lockKeys = new ArrayList<>();
 

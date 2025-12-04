@@ -2,7 +2,6 @@ package com.hh.ecom.product.infrastructure.redis;
 
 import com.hh.ecom.product.domain.ViewCountRepository;
 import com.hh.ecom.product.domain.exception.ViewCountFlushException;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -24,6 +23,7 @@ import java.util.stream.Collectors;
 public class RedisViewCountRepository implements ViewCountRepository {
 
     private static final String VIEW_DELTA_KEY_PREFIX = "product:view:delta:";
+    private static final String VIEW_DELTA_SET_KEY = "product:view:delta:set";
 
     private final Map<Long, AtomicInteger> viewCountBuffer = new ConcurrentHashMap<>();
     private final Random random = new Random();
@@ -32,14 +32,14 @@ public class RedisViewCountRepository implements ViewCountRepository {
     private static final int MAX_BUFFER_THRESHOLD = 10;
 
     private final RedisTemplate<String, Long> redisTemplate;
-    private final RedisTemplate<String, String> viewHistoryRedisTemplate;
+    private final RedisTemplate<String, String> customStringRedisTemplate;
 
     public RedisViewCountRepository(
             RedisTemplate<String, Long> redisTemplate,
-            @Qualifier("viewHistoryRedisTemplate") RedisTemplate<String, String> viewHistoryRedisTemplate
+            @Qualifier("customStringRedisTemplate") RedisTemplate<String, String> customStringRedisTemplate
     ) {
         this.redisTemplate = redisTemplate;
-        this.viewHistoryRedisTemplate = viewHistoryRedisTemplate;
+        this.customStringRedisTemplate = customStringRedisTemplate;
     }
 
     @Override
@@ -64,7 +64,10 @@ public class RedisViewCountRepository implements ViewCountRepository {
         String deltaKey = VIEW_DELTA_KEY_PREFIX + productId;
         redisTemplate.opsForValue().increment(deltaKey, count);
 
-        // 2. 각 기간별 Sorted Set의 score 증가 (member는 productId, score는 조회수)
+        // 2. productId를 Set에 추가 (중복 자동 제거)
+        redisTemplate.opsForSet().add(VIEW_DELTA_SET_KEY, productId);
+
+        // 3. 각 기간별 Sorted Set의 score 증가 (member는 productId, score는 조회수)
         String member = productId.toString();
         for (RedisViewPeriod period : RedisViewPeriod.values()) {
             incrementScoreWithTTL(period.getKey(), member, count, period.getTtlSeconds());
@@ -74,24 +77,25 @@ public class RedisViewCountRepository implements ViewCountRepository {
     }
 
     private void incrementScoreWithTTL(String key, String member, int count, long ttlSeconds) {
-        viewHistoryRedisTemplate.opsForZSet().incrementScore(key, member, count);
-        viewHistoryRedisTemplate.expire(key, ttlSeconds, TimeUnit.SECONDS);
+        customStringRedisTemplate.opsForZSet().incrementScore(key, member, count);
+        customStringRedisTemplate.expire(key, ttlSeconds, TimeUnit.SECONDS);
     }
 
     @Override
     public Map<Long, Long> getAndClearAllDeltas() {
         Map<Long, Long> deltas = new HashMap<>();
 
-        Set<String> keys = redisTemplate.keys(VIEW_DELTA_KEY_PREFIX + "*");
-        if (keys.isEmpty()) {
+        List<Long> productIds = redisTemplate.opsForSet().pop(VIEW_DELTA_SET_KEY, Long.MAX_VALUE);
+
+        if (productIds == null || productIds.isEmpty()) {
+            log.debug("No view count deltas to process");
             return deltas;
         }
 
-        // GETDEL을 사용하여 원자적으로 읽기 + 삭제 (Race Condition 방지)
         try {
-            for (String key : keys) {
-                Long productId = extractProductId(key);
-                Long delta = redisTemplate.opsForValue().getAndDelete(key);
+            for (Long productId : productIds) {
+                String deltaKey = VIEW_DELTA_KEY_PREFIX + productId;
+                Long delta = redisTemplate.opsForValue().getAndDelete(deltaKey);
 
                 if (delta != null && delta > 0) {
                     deltas.put(productId, delta);
@@ -100,7 +104,7 @@ public class RedisViewCountRepository implements ViewCountRepository {
 
             log.info("Successfully read and cleared {} view count deltas from Redis", deltas.size());
         } catch (Exception e) {
-            String errorMsg = String.format("Failed to get and delete view count deltas from Redis. Total keys: %d", keys.size());
+            String errorMsg = String.format("Failed to get and delete view count deltas from Redis. Total productIds: %d", productIds.size());
             log.error(errorMsg, e);
             throw new ViewCountFlushException(errorMsg, e);
         }
@@ -128,7 +132,7 @@ public class RedisViewCountRepository implements ViewCountRepository {
         }
 
         // Sorted Set에서 score 내림차순으로 상위 N개 조회
-        Set<String> topMembers = viewHistoryRedisTemplate.opsForZSet()
+        Set<String> topMembers = customStringRedisTemplate.opsForZSet()
                 .reverseRange(key, 0, limit - 1);
 
         if (topMembers == null || topMembers.isEmpty()) {
@@ -146,11 +150,6 @@ public class RedisViewCountRepository implements ViewCountRepository {
         return period != null ? period.getKey() : null;
     }
 
-    private Long extractProductId(String key) {
-        String idStr = key.substring(VIEW_DELTA_KEY_PREFIX.length());
-        return Long.parseLong(idStr);
-    }
-
     @Override
     public void flushBuffer() {
         viewCountBuffer.forEach((productId, counter) -> {
@@ -164,15 +163,20 @@ public class RedisViewCountRepository implements ViewCountRepository {
     }
 
     @Getter
-    @AllArgsConstructor
     private enum RedisViewPeriod {
-        ONE_DAY(1, "product:view:recent1d", 86400L),
-        THREE_DAYS(3, "product:view:recent3d", 86400L * 3),
-        SEVEN_DAYS(7, "product:view:recent7d", 86400L * 7);
+        ONE_DAY(1, "product:view:recent1d", TimeUnit.DAYS.toSeconds(1)),
+        THREE_DAYS(3, "product:view:recent3d", TimeUnit.DAYS.toSeconds(3)),
+        SEVEN_DAYS(7, "product:view:recent7d", TimeUnit.DAYS.toSeconds(7));
 
         private final int days;
         private final String key;
         private final long ttlSeconds;
+
+        RedisViewPeriod(int days, String key, long ttlSeconds) {
+            this.days = days;
+            this.key = key;
+            this.ttlSeconds = ttlSeconds;
+        }
 
         public static RedisViewPeriod fromDays(Integer days) {
             if (days == null) {

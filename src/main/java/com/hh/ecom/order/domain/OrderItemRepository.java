@@ -23,5 +23,22 @@ public interface OrderItemRepository {
      */
     List<ProductSalesCount> findTopProductsBySalesCount(int limit);
 
+    /**
+     * 전체 상품별 판매 수량 집계 (Redis 초기화용)
+     * COMPLETED 상태 주문의 모든 상품 집계
+     *
+     * @return 상품별 판매 수량 리스트
+     */
+    List<ProductSalesCount> findAllProductSalesCount();
+
+    /**
+     * 특정 날짜의 상품별 판매 수량 집계 (Redis 초기화용)
+     * COMPLETED 상태 주문의 특정 날짜 상품 집계
+     *
+     * @param date 집계 날짜
+     * @return 상품별 판매 수량 리스트
+     */
+    List<ProductSalesCount> findProductSalesCountByDate(java.time.LocalDate date);
+
     void deleteAll(); // testing
 }

@@ -295,11 +295,8 @@ class CouponServiceIntegrationTest extends TestContainersConfig {
         // Getter 메서드 테스트
         assertThat(firstCoupon.getCoupon()).isNotNull();
         assertThat(firstCoupon.getCouponUser()).isNotNull();
-        assertThat(firstCoupon.getCoupon().getDiscountAmount())
-                .isIn(
-                        new BigDecimal("5000.00"),
-                        new BigDecimal("8000.00")
-                );
+        assertThat(firstCoupon.getCoupon().getDiscountAmount().intValue())
+                .isIn(5000, 8000);
     }
 
     // Helper methods

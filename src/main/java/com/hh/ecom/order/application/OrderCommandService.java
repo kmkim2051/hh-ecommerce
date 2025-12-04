@@ -3,7 +3,7 @@ package com.hh.ecom.order.application;
 import com.hh.ecom.cart.application.CartService;
 import com.hh.ecom.cart.application.dto.OrderPreparationResult;
 import com.hh.ecom.cart.domain.CartItem;
-import com.hh.ecom.common.lock.LockKeyGenerator;
+import com.hh.ecom.common.lock.OrderLockContext;
 import com.hh.ecom.common.lock.RedisLockExecutor;
 import com.hh.ecom.coupon.application.CouponCommandService;
 import com.hh.ecom.coupon.application.CouponQueryService;
@@ -18,6 +18,7 @@ import com.hh.ecom.order.domain.exception.OrderException;
 import com.hh.ecom.point.application.PointService;
 import com.hh.ecom.point.domain.Point;
 import com.hh.ecom.product.application.ProductService;
+import com.hh.ecom.product.application.SalesRankingRepository;
 import com.hh.ecom.product.domain.Product;
 
 import lombok.RequiredArgsConstructor;
@@ -37,13 +38,18 @@ import java.util.stream.Collectors;
 public class OrderCommandService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+
     private final CartService cartService;
     private final ProductService productService;
+
     private final CouponQueryService couponQueryService;
     private final CouponCommandService couponCommandService;
+
     private final PointService pointService;
+    private final SalesRankingRepository salesRankingRepository;
+
     private final RedisLockExecutor redisLockExecutor;
-    private final LockKeyGenerator lockKeyGenerator;
+
     private final TransactionTemplate transactionTemplate;
 
     public Order createOrder(Long userId, CreateOrderCommand createOrderCommand) {
@@ -57,7 +63,11 @@ public class OrderCommandService {
         Long couponUserId = extractCouponUserId(userId, createOrderCommand.couponId());
 
         // 주문 내부 분산락 필요 도메인: [Product, Point, Coupon]
-        List<String> lockKeys = lockKeyGenerator.generateOrderLockKeys(userId, productIds, couponUserId);
+        List<String> lockKeys = new OrderLockContext()
+            .withUserPoint(userId)
+            .withProducts(productIds)
+            .withCoupon(couponUserId)
+            .buildSortedLockKeys();
         log.debug("분산락 키 생성 완료: keys={}", lockKeys);
 
         return redisLockExecutor.executeWithLock(lockKeys, () ->
@@ -73,7 +83,15 @@ public class OrderCommandService {
                 .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
 
         Order updatedOrder = order.updateStatus(newStatus);
-        return orderRepository.save(updatedOrder);
+        Order savedOrder = orderRepository.save(updatedOrder);
+
+        // COMPLETED 상태 전환 시 판매량 메트릭 수집
+        if (newStatus == OrderStatus.COMPLETED) {
+            List<OrderItem> orderItems = orderItemRepository.findByOrderId(orderId);
+            salesRankingRepository.recordBatchSales(orderId, orderItems);
+        }
+
+        return savedOrder;
     }
 
     // ------------------------------ Private Methods ------------------------------
@@ -189,12 +207,14 @@ public class OrderCommandService {
 
     private void useCoupon(Long couponUserId, Order savedOrder) {
         if (couponUserId != null) {
-            couponCommandService.useCouponWithinTransaction(couponUserId, savedOrder.getId());
+            // OrderService가 이미 락을 보유한 상태지만, 같은 스레드에서 재진입 허용됨 (Reentrant Lock)
+            couponCommandService.useCoupon(couponUserId, savedOrder.getId());
         }
     }
 
     private void usePoint(Long userId, BigDecimal finalAmount, Order savedOrder) {
-        pointService.usePointWithinTransaction(userId, finalAmount, savedOrder.getId());
+        // OrderService가 이미 락을 보유한 상태지만, 같은 스레드에서 재진입 허용 (Reentrant Lock)
+        pointService.usePoint(userId, finalAmount, savedOrder.getId());
     }
 
     private void decreaseProductStockInCart(List<CartItem> cartItems, Map<Long, Product> productMap) {

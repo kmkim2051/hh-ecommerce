@@ -43,6 +43,9 @@ class CouponControllerTest {
     @MockitoBean
     private CouponCommandService couponCommandService;
 
+    @MockitoBean
+    private com.hh.ecom.coupon.application.RedisCouponService redisCouponService;
+
     @Test
     @DisplayName("GET /coupons - 발급 가능한 쿠폰 목록 조회 성공")
     void getAvailableCoupons_Success() throws Exception {
@@ -90,28 +93,21 @@ class CouponControllerTest {
         // Given
         Long userId = 1L;
         Long couponId = 10L;
-        Long couponUserId = 100L;
 
-        Coupon coupon = createCoupon(couponId, "테스트 쿠폰", BigDecimal.valueOf(5000), 100, 99);
-        CouponUser couponUser = createCouponUser(couponUserId, userId, couponId, false);
-
-        given(couponCommandService.issueCoupon(userId, couponId)).willReturn(couponUser);
-        given(couponQueryService.getCoupon(couponId)).willReturn(coupon);
+        // Redis 기반 비동기 플로우는 즉시 QUEUED 응답 반환
+        doNothing().when(redisCouponService).enqueueUserIfEligible(userId, couponId);
 
         // When & Then
         mockMvc.perform(post("/coupons/{couponId}/issue", couponId)
                         .header("userId", userId))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(couponUserId))
+                .andExpect(jsonPath("$.status").value("QUEUED"))
                 .andExpect(jsonPath("$.couponId").value(couponId))
                 .andExpect(jsonPath("$.userId").value(userId))
-                .andExpect(jsonPath("$.couponName").value("테스트 쿠폰"))
-                .andExpect(jsonPath("$.discountAmount").value(5000))
-                .andExpect(jsonPath("$.message").value("쿠폰이 발급되었습니다."));
+                .andExpect(jsonPath("$.message").value("쿠폰 발급 요청이 접수되었습니다. 곧 처리됩니다."));
 
-        verify(couponCommandService, times(1)).issueCoupon(userId, couponId);
-        verify(couponQueryService, times(1)).getCoupon(couponId);
+        verify(redisCouponService, times(1)).enqueueUserIfEligible(userId, couponId);
     }
 
     @Test
@@ -133,8 +129,8 @@ class CouponControllerTest {
         Long userId = 1L;
         Long couponId = 10L;
 
-        given(couponCommandService.issueCoupon(userId, couponId))
-                .willThrow(new CouponException(CouponErrorCode.COUPON_ALREADY_ISSUED));
+        doThrow(new CouponException(CouponErrorCode.COUPON_ALREADY_ISSUED))
+                .when(redisCouponService).enqueueUserIfEligible(userId, couponId);
 
         // When & Then
         mockMvc.perform(post("/coupons/{couponId}/issue", couponId)
@@ -142,7 +138,7 @@ class CouponControllerTest {
                 .andDo(print())
                 .andExpect(status().isConflict());
 
-        verify(couponCommandService, times(1)).issueCoupon(userId, couponId);
+        verify(redisCouponService, times(1)).enqueueUserIfEligible(userId, couponId);
     }
 
     @Test
@@ -152,8 +148,8 @@ class CouponControllerTest {
         Long userId = 1L;
         Long couponId = 10L;
 
-        given(couponCommandService.issueCoupon(userId, couponId))
-                .willThrow(new CouponException(CouponErrorCode.COUPON_SOLD_OUT));
+        doThrow(new CouponException(CouponErrorCode.COUPON_SOLD_OUT))
+                .when(redisCouponService).enqueueUserIfEligible(userId, couponId);
 
         // When & Then
         mockMvc.perform(post("/coupons/{couponId}/issue", couponId)
@@ -161,7 +157,7 @@ class CouponControllerTest {
                 .andDo(print())
                 .andExpect(status().isBadRequest());
 
-        verify(couponCommandService, times(1)).issueCoupon(userId, couponId);
+        verify(redisCouponService, times(1)).enqueueUserIfEligible(userId, couponId);
     }
 
     @Test
@@ -171,8 +167,8 @@ class CouponControllerTest {
         Long userId = 1L;
         Long couponId = 99999L;
 
-        given(couponCommandService.issueCoupon(userId, couponId))
-                .willThrow(new CouponException(CouponErrorCode.COUPON_NOT_FOUND));
+        doThrow(new CouponException(CouponErrorCode.COUPON_NOT_FOUND))
+                .when(redisCouponService).enqueueUserIfEligible(userId, couponId);
 
         // When & Then
         mockMvc.perform(post("/coupons/{couponId}/issue", couponId)
@@ -180,7 +176,7 @@ class CouponControllerTest {
                 .andDo(print())
                 .andExpect(status().isNotFound());
 
-        verify(couponCommandService, times(1)).issueCoupon(userId, couponId);
+        verify(redisCouponService, times(1)).enqueueUserIfEligible(userId, couponId);
     }
 
     @Test

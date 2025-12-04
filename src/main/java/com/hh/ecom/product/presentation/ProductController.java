@@ -50,16 +50,16 @@ public class ProductController implements ProductApi {
     @GetMapping("/ranking/views")
     public ResponseEntity<ProductListResponse> getProductsByViewCount(
             @RequestParam(required = false, defaultValue = "10") Integer limit) {
-        List<Product> products = productService.getProductsByViewCount(limit);
+        List<Product> products = productService.getTopByViewCount(limit);
         return ResponseEntity.ok(ProductListResponse.from(products));
     }
 
     @Override
     @GetMapping("/ranking/views/recent")
     public ResponseEntity<ProductListResponse> getProductsByViewCountInRecentDays(
-            @RequestParam(required = true) Integer days,
+            @RequestParam Integer days,
             @RequestParam(required = false, defaultValue = "10") Integer limit) {
-        List<Product> products = productService.getProductsByViewCountInRecentDays(days, limit);
+        List<Product> products = productService.getTopByViewCountInRecentDays(days, limit);
         return ResponseEntity.ok(ProductListResponse.from(products));
     }
 
@@ -67,16 +67,16 @@ public class ProductController implements ProductApi {
     @GetMapping("/ranking/sales")
     public ResponseEntity<ProductListResponse> getProductsBySalesCount(
             @RequestParam(required = false, defaultValue = "10") Integer limit) {
-        List<Product> products = productService.getProductsBySalesCount(limit);
+        List<Product> products = productService.getTopBySalesCount(limit);
         return ResponseEntity.ok(ProductListResponse.from(products));
     }
 
     @Override
     @GetMapping("/ranking/sales/recent")
     public ResponseEntity<ProductListResponse> getProductsBySalesCountInRecentDays(
-            @RequestParam(required = true) Integer days,
+            @RequestParam Integer days,
             @RequestParam(required = false, defaultValue = "10") Integer limit) {
-        List<Product> products = productService.getProductsBySalesCountInRecentDays(days, limit);
+        List<Product> products = productService.getTopBySalesCountInRecentDays(days, limit);
         return ResponseEntity.ok(ProductListResponse.from(products));
     }
 }
