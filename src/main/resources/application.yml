@@ -25,3 +25,14 @@ spring:
       host: localhost
       port: 6379
       timeout: 3000ms
+
+# Coupon worker configuration
+coupon:
+  worker:
+    batch-size: 50
+    retry-on-failure: false
+
+# Ranking strategy configuration
+ranking:
+  sales:
+    strategy: redis  # redis 또는 db

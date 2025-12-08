@@ -23,7 +23,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
@@ -32,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
@@ -90,7 +88,6 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         when(productService.getProductList(List.of(productId))).thenReturn(List.of(product));
         when(pointService.hasPointAccount(userId)).thenReturn(true);
         when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(5000000)));
-        when(pointService.usePointWithinTransaction(anyLong(), any(BigDecimal.class), anyLong())).thenReturn(null);
         doNothing().when(cartService).completeOrderCheckout(anyLong(), anyList());
 
         CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), null);
@@ -145,8 +142,6 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         );
         when(pointService.hasPointAccount(userId)).thenReturn(true);
         when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(100000)));
-        when(pointService.usePointWithinTransaction(anyLong(), any(BigDecimal.class), anyLong())).thenReturn(null);
-        when(couponCommandService.useCouponWithinTransaction(anyLong(), anyLong())).thenReturn(null);
         doNothing().when(cartService).completeOrderCheckout(anyLong(), anyList());
 
         CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), couponId);
@@ -160,8 +155,8 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         assertThat(createdOrder.getCouponUserId()).isEqualTo(couponUserId);
         assertThat(createdOrder.getStatus()).isEqualTo(OrderStatus.PAID);
 
-        verify(couponCommandService).useCouponWithinTransaction(couponUserId, createdOrder.getId());
-        verify(pointService).usePointWithinTransaction(userId, BigDecimal.valueOf(45000), createdOrder.getId());
+        verify(couponCommandService).useCoupon(couponUserId, createdOrder.getId());
+        verify(pointService).usePoint(userId, BigDecimal.valueOf(45000), createdOrder.getId());
     }
 
     @Test
@@ -359,7 +354,6 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
                 .thenReturn(List.of(product1, product2));
         when(pointService.hasPointAccount(userId)).thenReturn(true);
         when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(5000000)));
-        when(pointService.usePointWithinTransaction(anyLong(), any(BigDecimal.class), anyLong())).thenReturn(null);
         doNothing().when(cartService).completeOrderCheckout(anyLong(), anyList());
 
         CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId1, cartItemId2), null);
@@ -396,7 +390,6 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         lenient().when(productService.getProductList(List.of(productId))).thenReturn(List.of(product));
         lenient().when(pointService.hasPointAccount(userId)).thenReturn(true);
         lenient().when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(10000000)));
-        lenient().when(pointService.usePointWithinTransaction(anyLong(), any(BigDecimal.class), anyLong())).thenReturn(null);
         lenient().doNothing().when(cartService).completeOrderCheckout(anyLong(), anyList());
     }
 
