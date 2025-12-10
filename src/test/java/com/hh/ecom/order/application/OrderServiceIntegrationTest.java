@@ -14,6 +14,8 @@ import com.hh.ecom.order.application.dto.CreateOrderCommand;
 import com.hh.ecom.order.domain.*;
 import com.hh.ecom.order.domain.exception.OrderErrorCode;
 import com.hh.ecom.order.domain.exception.OrderException;
+import com.hh.ecom.outbox.domain.OutboxEvent;
+import com.hh.ecom.outbox.domain.OutboxEventRepository;
 import com.hh.ecom.point.application.PointService;
 import com.hh.ecom.point.domain.Point;
 import com.hh.ecom.product.application.ProductService;
@@ -56,6 +58,8 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
     private OrderItemRepository orderItemRepository;
     @Autowired
     private SalesRankingRepository salesRankingRepository;
+    @Autowired
+    private OutboxEventRepository outboxEventRepository;
 
     @Autowired
     @org.springframework.beans.factory.annotation.Qualifier("customStringRedisTemplate")
@@ -76,6 +80,7 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
     void setUp() {
         orderItemRepository.deleteAll();
         orderRepository.deleteAll();
+        outboxEventRepository.deleteAll();
         cleanupRedisKeys();
     }
 
@@ -259,6 +264,164 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         Long ttl = redisTemplate.getExpire(dailyKey, java.util.concurrent.TimeUnit.SECONDS);
         assertThat(ttl).isNotNull();
         assertThat(ttl).isGreaterThan(0L); // 30일 TTL
+    }
+
+    @Test
+    @DisplayName("통합 테스트 - 주문 생성 시 Outbox 이벤트가 트랜잭션 커밋 후 생성됨")
+    void integration_CreateOrder_CreatesOutboxEventAfterCommit() throws InterruptedException {
+        // given
+        Long userId = 1L;
+        Long cartItemId = 100L;
+        Long productId = 1000L;
+
+        setupMocksForUser(userId, cartItemId, productId, "상품", BigDecimal.valueOf(10000));
+
+        // when
+        CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), null);
+        Order createdOrder = orderCommandService.createOrder(userId, command);
+
+        // then - 주문이 성공적으로 생성됨
+        assertThat(createdOrder).isNotNull();
+        assertThat(createdOrder.getStatus()).isEqualTo(OrderStatus.PAID);
+
+        // @TransactionalEventListener(AFTER_COMMIT)는 트랜잭션 커밋 후 동기적으로 실행되지만
+        // 별도 트랜잭션에서 실행되므로 약간의 대기가 필요할 수 있음
+        Thread.sleep(200);
+
+        // then - Outbox 이벤트가 생성되었는지 확인
+        List<OutboxEvent> outboxEvents = outboxEventRepository.findByOrderId(createdOrder.getId());
+        assertThat(outboxEvents).isNotEmpty();
+        assertThat(outboxEvents).hasSize(1);
+
+        OutboxEvent outboxEvent = outboxEvents.get(0);
+        assertThat(outboxEvent.getOrderId()).isEqualTo(createdOrder.getId());
+        assertThat(outboxEvent.getOrderStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(outboxEvent.getCreatedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("통합 테스트 - 여러 주문 생성 시 각각 독립적인 Outbox 이벤트 생성")
+    void integration_CreateMultipleOrders_CreatesIndependentOutboxEvents() throws InterruptedException {
+        // given
+        Long userId1 = 1L;
+        Long userId2 = 2L;
+        Long cartItemId1 = 100L;
+        Long cartItemId2 = 200L;
+        Long productId1 = 1000L;
+        Long productId2 = 2000L;
+
+        setupMocksForUser(userId1, cartItemId1, productId1, "상품1", BigDecimal.valueOf(10000));
+        setupMocksForUser(userId2, cartItemId2, productId2, "상품2", BigDecimal.valueOf(20000));
+
+        // when - 두 개의 주문 생성
+        CreateOrderCommand command1 = new CreateOrderCommand(List.of(cartItemId1), null);
+        CreateOrderCommand command2 = new CreateOrderCommand(List.of(cartItemId2), null);
+
+        Order order1 = orderCommandService.createOrder(userId1, command1);
+        Order order2 = orderCommandService.createOrder(userId2, command2);
+
+        Thread.sleep(200);
+
+        // then - 각 주문마다 독립적인 Outbox 이벤트가 생성됨
+        List<OutboxEvent> events1 = outboxEventRepository.findByOrderId(order1.getId());
+        List<OutboxEvent> events2 = outboxEventRepository.findByOrderId(order2.getId());
+
+        assertThat(events1).hasSize(1);
+        assertThat(events2).hasSize(1);
+
+        assertThat(events1.get(0).getOrderId()).isEqualTo(order1.getId());
+        assertThat(events2.get(0).getOrderId()).isEqualTo(order2.getId());
+
+        // 전체 Outbox 이벤트 개수 확인
+        List<OutboxEvent> allEvents = outboxEventRepository.findAll();
+        assertThat(allEvents).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("통합 테스트 - 주문 생성 시 Outbox 이벤트는 한 번만 발행됨 (중복 방지)")
+    void integration_CreateOrder_OutboxEventPublishedOnlyOnce() throws InterruptedException {
+        // given
+        Long userId = 1L;
+        Long cartItemId = 100L;
+        Long productId = 1000L;
+
+        setupMocksForUser(userId, cartItemId, productId, "상품", BigDecimal.valueOf(10000));
+
+        // when - 주문 생성
+        CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), null);
+        Order createdOrder = orderCommandService.createOrder(userId, command);
+
+        Thread.sleep(200);
+
+        // then - Outbox 이벤트가 정확히 1개만 생성됨
+        List<OutboxEvent> outboxEvents = outboxEventRepository.findByOrderId(createdOrder.getId());
+        assertThat(outboxEvents).hasSize(1);
+
+        // 여러 번 조회해도 개수는 동일
+        List<OutboxEvent> outboxEventsSecondQuery = outboxEventRepository.findByOrderId(createdOrder.getId());
+        assertThat(outboxEventsSecondQuery).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("통합 테스트 - Outbox 이벤트의 타임스탬프가 주문 생성 시점과 근접함")
+    void integration_CreateOrder_OutboxEventTimestampIsCloseToOrderCreation() throws InterruptedException {
+        // given
+        Long userId = 1L;
+        Long cartItemId = 100L;
+        Long productId = 1000L;
+
+        setupMocksForUser(userId, cartItemId, productId, "상품", BigDecimal.valueOf(10000));
+
+        // when
+        LocalDateTime beforeCreation = LocalDateTime.now();
+        CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), null);
+        Order createdOrder = orderCommandService.createOrder(userId, command);
+        LocalDateTime afterCreation = LocalDateTime.now();
+
+        Thread.sleep(200);
+
+        // then - Outbox 이벤트의 타임스탬프가 주문 생성 시간대에 있음
+        List<OutboxEvent> outboxEvents = outboxEventRepository.findByOrderId(createdOrder.getId());
+        assertThat(outboxEvents).hasSize(1);
+
+        OutboxEvent event = outboxEvents.get(0);
+        assertThat(event.getCreatedAt())
+                .isAfterOrEqualTo(beforeCreation.minusSeconds(1))
+                .isBeforeOrEqualTo(afterCreation.plusSeconds(2));
+    }
+
+    @Test
+    @DisplayName("통합 테스트 - 동일 사용자의 여러 주문 각각 Outbox 이벤트 생성")
+    void integration_CreateMultipleOrdersBySameUser_EachCreatesOutboxEvent() throws InterruptedException {
+        // given
+        Long userId = 1L;
+        Long cartItemId1 = 100L;
+        Long cartItemId2 = 200L;
+        Long productId1 = 1000L;
+        Long productId2 = 2000L;
+
+        setupMocksForUser(userId, cartItemId1, productId1, "상품1", BigDecimal.valueOf(10000));
+        setupMocksForUser(userId, cartItemId2, productId2, "상품2", BigDecimal.valueOf(20000));
+
+        // when - 같은 사용자가 두 번 주문
+        CreateOrderCommand command1 = new CreateOrderCommand(List.of(cartItemId1), null);
+        CreateOrderCommand command2 = new CreateOrderCommand(List.of(cartItemId2), null);
+
+        Order order1 = orderCommandService.createOrder(userId, command1);
+        Order order2 = orderCommandService.createOrder(userId, command2);
+
+        Thread.sleep(200);
+
+        // then - 각 주문마다 Outbox 이벤트 생성
+        List<OutboxEvent> events1 = outboxEventRepository.findByOrderId(order1.getId());
+        List<OutboxEvent> events2 = outboxEventRepository.findByOrderId(order2.getId());
+
+        assertThat(events1).hasSize(1);
+        assertThat(events2).hasSize(1);
+
+        // 모든 이벤트가 PAID 상태
+        assertThat(events1.get(0).getOrderStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(events2.get(0).getOrderStatus()).isEqualTo(OrderStatus.PAID);
     }
 
     @Test

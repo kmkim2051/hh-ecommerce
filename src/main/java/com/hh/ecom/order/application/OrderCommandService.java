@@ -13,9 +13,9 @@ import com.hh.ecom.coupon.domain.CouponUserWithCoupon;
 import com.hh.ecom.order.application.dto.CreateOrderCommand;
 import com.hh.ecom.order.application.dto.DiscountInfo;
 import com.hh.ecom.order.domain.*;
+import com.hh.ecom.order.application.event.OrderCompletedEvent;
 import com.hh.ecom.order.domain.exception.OrderErrorCode;
 import com.hh.ecom.order.domain.exception.OrderException;
-import com.hh.ecom.outbox.application.OutboxEventService;
 import com.hh.ecom.point.application.PointService;
 import com.hh.ecom.point.domain.Point;
 import com.hh.ecom.product.application.ProductService;
@@ -24,6 +24,7 @@ import com.hh.ecom.product.domain.Product;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -48,8 +49,8 @@ public class OrderCommandService {
 
     private final PointService pointService;
     private final SalesRankingRepository salesRankingRepository;
-    private final OutboxEventService outboxEventService;
 
+    private final ApplicationEventPublisher eventPublisher;
     private final RedisLockExecutor redisLockExecutor;
 
     private final TransactionTemplate transactionTemplate;
@@ -158,8 +159,8 @@ public class OrderCommandService {
         // 결제 완료 시점에 판매량 랭킹 기록
         salesRankingRepository.recordBatchSales(updatedOrder.getId(), savedOrderItems);
 
-        // 결제 완료 시점에 Outbox 이벤트 발행 (외부 시스템 알림용)
-        outboxEventService.publishOrderEvent(updatedOrder.getId(), OrderStatus.PAID);
+        // 결제 완료 이벤트 발행 (외부 시스템 알림용, 트랜잭션 커밋 후 처리됨)
+        eventPublisher.publishEvent(OrderCompletedEvent.from(updatedOrder));
 
         log.info("주문 생성 완료: orderId={}, orderNumber={}", updatedOrder.getId(), updatedOrder.getOrderNumber());
         return updatedOrder.setOrderItems(savedOrderItems);
