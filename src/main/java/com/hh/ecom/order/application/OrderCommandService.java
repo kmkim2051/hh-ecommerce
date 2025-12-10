@@ -15,6 +15,7 @@ import com.hh.ecom.order.application.dto.DiscountInfo;
 import com.hh.ecom.order.domain.*;
 import com.hh.ecom.order.domain.exception.OrderErrorCode;
 import com.hh.ecom.order.domain.exception.OrderException;
+import com.hh.ecom.outbox.application.OutboxEventService;
 import com.hh.ecom.point.application.PointService;
 import com.hh.ecom.point.domain.Point;
 import com.hh.ecom.product.application.ProductService;
@@ -47,6 +48,7 @@ public class OrderCommandService {
 
     private final PointService pointService;
     private final SalesRankingRepository salesRankingRepository;
+    private final OutboxEventService outboxEventService;
 
     private final RedisLockExecutor redisLockExecutor;
 
@@ -155,6 +157,9 @@ public class OrderCommandService {
 
         // 결제 완료 시점에 판매량 랭킹 기록
         salesRankingRepository.recordBatchSales(updatedOrder.getId(), savedOrderItems);
+
+        // 결제 완료 시점에 Outbox 이벤트 발행 (외부 시스템 알림용)
+        outboxEventService.publishOrderEvent(updatedOrder.getId(), OrderStatus.PAID);
 
         log.info("주문 생성 완료: orderId={}, orderNumber={}", updatedOrder.getId(), updatedOrder.getOrderNumber());
         return updatedOrder.setOrderItems(savedOrderItems);
