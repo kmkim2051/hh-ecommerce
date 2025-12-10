@@ -17,18 +17,24 @@ import com.hh.ecom.order.domain.exception.OrderException;
 import com.hh.ecom.point.application.PointService;
 import com.hh.ecom.point.domain.Point;
 import com.hh.ecom.product.application.ProductService;
+import com.hh.ecom.product.application.SalesRankingRepository;
 import com.hh.ecom.product.domain.Product;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -38,6 +44,8 @@ import static org.mockito.Mockito.*;
 @DisplayName("OrderService 통합 테스트 (Service + Repository)")
 class OrderServiceIntegrationTest extends TestContainersConfig {
 
+    private static final DateTimeFormatter DAY_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
+
     @Autowired
     private OrderCommandService orderCommandService;
     @Autowired
@@ -46,6 +54,12 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
     private OrderRepository orderRepository;
     @Autowired
     private OrderItemRepository orderItemRepository;
+    @Autowired
+    private SalesRankingRepository salesRankingRepository;
+
+    @Autowired
+    @org.springframework.beans.factory.annotation.Qualifier("customStringRedisTemplate")
+    private RedisTemplate<String, String> redisTemplate;
 
     @MockitoBean
     private CartService cartService;
@@ -62,6 +76,12 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
     void setUp() {
         orderItemRepository.deleteAll();
         orderRepository.deleteAll();
+        cleanupRedisKeys();
+    }
+
+    @AfterEach
+    void tearDown() {
+        cleanupRedisKeys();
     }
 
     @Test
@@ -189,25 +209,204 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
     }
 
     @Test
-    @DisplayName("통합 테스트 - 주문 상태 변경")
-    void integration_UpdateOrderStatus() {
+    @DisplayName("통합 테스트 - 주문 생성 시 Redis 전체 기간 랭킹 기록")
+    void integration_CreateOrder_RecordsAllTimeRanking() {
+        // given
         Long userId = 1L;
         Long cartItemId = 100L;
         Long productId = 1000L;
+        Integer quantity = 1;
+
+        setupMocksForUser(userId, cartItemId, productId, "상품", BigDecimal.valueOf(10000));
+
+        // when
+        CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), null);
+        Order createdOrder = orderCommandService.createOrder(userId, command);
+
+        // then
+        assertThat(createdOrder.getStatus()).isEqualTo(OrderStatus.PAID);
+
+        String allTimeKey = "product:ranking:sales:all";
+        Double allTimeScore = redisTemplate.opsForZSet().score(allTimeKey, productId.toString());
+        assertThat(allTimeScore).isNotNull();
+        assertThat(allTimeScore.intValue()).isEqualTo(quantity);
+    }
+
+    @Test
+    @DisplayName("통합 테스트 - 주문 생성 시 Redis 일별 랭킹 기록 및 TTL 설정")
+    void integration_CreateOrder_RecordsDailyRankingWithTTL() {
+        // given
+        Long userId = 1L;
+        Long cartItemId = 100L;
+        Long productId = 1000L;
+        Integer quantity = 1;
+
+        setupMocksForUser(userId, cartItemId, productId, "상품", BigDecimal.valueOf(10000));
+
+        // when
+        CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), null);
+        orderCommandService.createOrder(userId, command);
+
+        // then - 일별 랭킹 기록 확인
+
+        String today = LocalDate.now().format(DAY_FORMAT);
+        String dailyKey = "product:ranking:sales:daily:" + today;
+        Double dailyScore = redisTemplate.opsForZSet().score(dailyKey, productId.toString());
+        assertThat(dailyScore).isNotNull();
+        assertThat(dailyScore.intValue()).isEqualTo(quantity);
+
+        // then - TTL 설정 확인
+        Long ttl = redisTemplate.getExpire(dailyKey, java.util.concurrent.TimeUnit.SECONDS);
+        assertThat(ttl).isNotNull();
+        assertThat(ttl).isGreaterThan(0L); // 30일 TTL
+    }
+
+    @Test
+    @DisplayName("통합 테스트 - 주문 상태를 COMPLETED로 변경 시 중복 기록 방지")
+    void integration_UpdateOrderStatus_PreventsDuplicateRecording() {
+        // given
+        Long userId = 1L;
+        Long cartItemId = 100L;
+        Long productId = 1000L;
+        Integer quantity = 1;
 
         setupMocksForUser(userId, cartItemId, productId, "상품", BigDecimal.valueOf(10000));
 
         CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), null);
         Order createdOrder = orderCommandService.createOrder(userId, command);
 
-        assertThat(createdOrder.getStatus()).isEqualTo(OrderStatus.PAID);
+        String allTimeKey = "product:ranking:sales:all";
+        String today = LocalDate.now().format(DAY_FORMAT);
+        String dailyKey = "product:ranking:sales:daily:" + today;
 
+        // when - COMPLETED로 상태 변경
         Order completedOrder = orderCommandService.updateOrderStatus(createdOrder.getId(), OrderStatus.COMPLETED);
 
+        // then - 주문 상태 확인
         assertThat(completedOrder.getStatus()).isEqualTo(OrderStatus.COMPLETED);
 
+        // then - 중복 기록 방지 확인 (여전히 1개)
+        Double allTimeScore = redisTemplate.opsForZSet().score(allTimeKey, productId.toString());
+        Double dailyScore = redisTemplate.opsForZSet().score(dailyKey, productId.toString());
+        assertThat(allTimeScore.intValue()).isEqualTo(quantity);
+        assertThat(dailyScore.intValue()).isEqualTo(quantity);
+
+        // then - DB 조회 확인
         Order retrievedOrder = orderQueryService.getOrderById(createdOrder.getId());
         assertThat(retrievedOrder.getStatus()).isEqualTo(OrderStatus.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("통합 테스트 - Redis에 존재하지 않는 상품 ID 조회")
+    void integration_RedisRanking_NonExistentProduct() {
+        // given
+        String allTimeKey = "product:ranking:sales:all";
+        Long nonExistentProductId = 99999L;
+
+        // when
+        Double score = redisTemplate.opsForZSet().score(allTimeKey, nonExistentProductId.toString());
+
+        // then
+        assertThat(score).isNull();
+    }
+
+    @Test
+    @DisplayName("통합 테스트 - 한 주문에 여러 상품 포함 시 각 상품별 수량 기록")
+    void integration_RedisRanking_MultipleProductsInOneOrder() {
+        // given
+        Long userId = 1L;
+        Long productId1 = 2001L;
+        Long productId2 = 2002L;
+
+        CartItem cartItem1 = createCartItem(101L, userId, productId1, 3);
+        CartItem cartItem2 = createCartItem(102L, userId, productId2, 5);
+        Product product1 = createProduct(productId1, "상품1", BigDecimal.valueOf(10000), 100);
+        Product product2 = createProduct(productId2, "상품2", BigDecimal.valueOf(20000), 100);
+
+        lenient().when(cartService.getCartItemById(101L)).thenReturn(cartItem1);
+        lenient().when(cartService.getCartItemById(102L)).thenReturn(cartItem2);
+        lenient().when(cartService.prepareOrderFromCart(userId, List.of(101L, 102L)))
+                .thenReturn(OrderPreparationResult.of(
+                        List.of(cartItem1, cartItem2),
+                        BigDecimal.valueOf(130000),
+                        List.of(productId1, productId2),
+                        Map.of(productId1, 3, productId2, 5)
+                ));
+        lenient().when(productService.getProductList(List.of(productId1, productId2)))
+                .thenReturn(List.of(product1, product2));
+        lenient().when(pointService.hasPointAccount(userId)).thenReturn(true);
+        lenient().when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(10000000)));
+        lenient().doNothing().when(cartService).completeOrderCheckout(anyLong(), anyList());
+
+        // when
+        CreateOrderCommand command = new CreateOrderCommand(List.of(101L, 102L), null);
+        orderCommandService.createOrder(userId, command);
+
+        // then
+        String allTimeKey = "product:ranking:sales:all";
+        Double product1Score = redisTemplate.opsForZSet().score(allTimeKey, productId1.toString());
+        Double product2Score = redisTemplate.opsForZSet().score(allTimeKey, productId2.toString());
+
+        assertThat(product1Score.intValue()).isEqualTo(3);
+        assertThat(product2Score.intValue()).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("통합 테스트 - 동일 상품 여러 주문 시 판매량 누적")
+    void integration_RedisRanking_AccumulatesSameProduct() {
+        // given
+        Long userId = 1L;
+        Long productId = 3000L;
+        Product product = createProduct(productId, "상품", BigDecimal.valueOf(10000), 100);
+
+        // 첫 번째 주문: 3개
+        CartItem cartItem1 = createCartItem(201L, userId, productId, 3);
+        lenient().when(cartService.getCartItemById(201L)).thenReturn(cartItem1);
+        lenient().when(cartService.prepareOrderFromCart(userId, List.of(201L)))
+                .thenReturn(OrderPreparationResult.of(
+                        List.of(cartItem1),
+                        BigDecimal.valueOf(30000),
+                        List.of(productId),
+                        Map.of(productId, 3)
+                ));
+        lenient().when(productService.getProductList(List.of(productId))).thenReturn(List.of(product));
+        lenient().when(pointService.hasPointAccount(userId)).thenReturn(true);
+        lenient().when(pointService.getPoint(userId)).thenReturn(createPoint(userId, BigDecimal.valueOf(10000000)));
+        lenient().doNothing().when(cartService).completeOrderCheckout(anyLong(), anyList());
+
+        orderCommandService.createOrder(userId, new CreateOrderCommand(List.of(201L), null));
+
+        // 두 번째 주문: 2개
+        CartItem cartItem2 = createCartItem(202L, userId, productId, 2);
+        lenient().when(cartService.getCartItemById(202L)).thenReturn(cartItem2);
+        lenient().when(cartService.prepareOrderFromCart(userId, List.of(202L)))
+                .thenReturn(OrderPreparationResult.of(
+                        List.of(cartItem2),
+                        BigDecimal.valueOf(20000),
+                        List.of(productId),
+                        Map.of(productId, 2)
+                ));
+
+        // when
+        orderCommandService.createOrder(userId, new CreateOrderCommand(List.of(202L), null));
+
+        // then - 누적 확인 (3 + 2 = 5)
+        String allTimeKey = "product:ranking:sales:all";
+        Double accumulatedScore = redisTemplate.opsForZSet().score(allTimeKey, productId.toString());
+        assertThat(accumulatedScore.intValue()).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("통합 테스트 - 잘못된 Redis Key 조회 시 빈 결과 반환")
+    void integration_RedisRanking_InvalidKey() {
+        // given
+        String invalidKey = "product:ranking:sales:invalid:key";
+
+        // when
+        Long size = redisTemplate.opsForZSet().size(invalidKey);
+
+        // then
+        assertThat(size).isEqualTo(0L);
     }
 
     @Test
@@ -454,5 +653,17 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
                 .expireDate(LocalDateTime.now().plusDays(30))
                 .isUsed(isUsed)
                 .build();
+    }
+
+    private void cleanupRedisKeys() {
+        try {
+            // Clean up sales ranking keys
+            Set<String> rankingKeys = redisTemplate.keys("product:ranking:sales:*");
+            if (!rankingKeys.isEmpty()) {
+                redisTemplate.delete(rankingKeys);
+            }
+        } catch (Exception e) {
+            // Ignore cleanup errors
+        }
     }
 }
