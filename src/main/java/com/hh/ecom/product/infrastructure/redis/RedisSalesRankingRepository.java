@@ -93,7 +93,7 @@ public class RedisSalesRankingRepository implements SalesRankingRepository {
             redisRepository.incrementSalesCount(productId, quantity, today);
             log.info("판매량 기록 완료: productId={}, quantity={}", productId, quantity);
         } catch (Exception e) {
-            log.error("판매량 기록 실패 (Redis): productId={}, error={}", productId, e.getMessage());
+            log.warn("판매량 기록 실패 (Redis): productId={}, error={}", productId, e.getMessage());
         }
     }
 

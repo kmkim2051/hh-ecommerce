@@ -77,6 +77,20 @@ public class OrderCommandService {
         );
     }
 
+    /**
+     * 주문 상태 업데이트
+     *
+     * ⚠️ (피드백) 현재 프로덕션 코드에서는 사용되지 않음 (테스트 전용)
+     *
+     * 현재 주문 흐름:
+     * - PENDING (주문 생성) → PAID (결제 완료) → 종료
+     * - createOrder()에서 PAID 시점에 판매 랭킹 기록
+     *
+     * 향후 확장 가능성:
+     * 1. 주문 취소 기능: PAID → CANCELED 전환 시 사용
+     * 2. 배송 완료 기능: PAID → DELIVERED → COMPLETED 전환 시 사용
+     * 3. 구매 확정 기능: DELIVERED → CONFIRMED/COMPLETED 전환 시 사용
+     */
     @Transactional
     public Order updateOrderStatus(Long orderId, OrderStatus newStatus) {
         Order order = orderRepository.findById(orderId)
@@ -86,6 +100,7 @@ public class OrderCommandService {
         Order savedOrder = orderRepository.save(updatedOrder);
 
         // COMPLETED 상태 전환 시 판매량 메트릭 수집
+        // 참고: 현재는 createOrder()에서 PAID 시점에 이미 기록하므로 이 로직은 실행되지 않음
         if (newStatus == OrderStatus.COMPLETED) {
             List<OrderItem> orderItems = orderItemRepository.findByOrderId(orderId);
             salesRankingRepository.recordBatchSales(orderId, orderItems);
@@ -137,6 +152,9 @@ public class OrderCommandService {
         Order updatedOrder = orderRepository.save(paidOrder);
 
         cartService.completeOrderCheckout(userId, productIds);
+
+        // 결제 완료 시점에 판매량 랭킹 기록
+        salesRankingRepository.recordBatchSales(updatedOrder.getId(), savedOrderItems);
 
         log.info("주문 생성 완료: orderId={}, orderNumber={}", updatedOrder.getId(), updatedOrder.getOrderNumber());
         return updatedOrder.setOrderItems(savedOrderItems);

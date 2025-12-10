@@ -64,7 +64,7 @@ public class SalesRankingRedisRepository {
 
             log.debug("판매량 증가 완료: productId={}, quantity={}, date={}", productId, quantity, date);
         } catch (Exception e) {
-            log.error("판매량 증가 실패: productId={}, quantity={}, error={}", productId, quantity, e.getMessage(), e);
+            log.warn("판매량 증가 실패: productId={}, quantity={}, error={}", productId, quantity, e.getMessage(), e);
             throw new RuntimeException("판매량 증가 실패", e);
         }
     }
