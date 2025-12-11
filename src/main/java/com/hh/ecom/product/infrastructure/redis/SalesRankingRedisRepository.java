@@ -28,6 +28,14 @@ public class SalesRankingRedisRepository {
     private static final int DAILY_KEY_TTL_DAYS = 30;
     private static final Duration DAILY_KEY_TIMEOUT = Duration.ofDays(DAILY_KEY_TTL_DAYS);
 
+    // 전체 기간 키 TTL: 1년 (기존 영구 보관에서 변경)
+    private static final int ALL_TIME_KEY_TTL_DAYS = 365;
+    private static final Duration ALL_TIME_KEY_TIMEOUT = Duration.ofDays(ALL_TIME_KEY_TTL_DAYS);
+
+    // 초기화 플래그 키
+    private static final String INITIALIZATION_FLAG_KEY = "product:ranking:sales:initialized";
+    private static final Duration INITIALIZATION_FLAG_TTL = Duration.ofDays(365);
+
     /**
      * 판매량 증가 (원자적 연산)
      * - 전체 기간 랭킹과 일별 랭킹 동시 업데이트
@@ -53,13 +61,12 @@ public class SalesRankingRedisRepository {
         String productIdStr = productId.toString();
 
         try {
-            // 전체 기간 랭킹 업데이트
+            // 전체 기간 랭킹 업데이트 (1년 TTL)
             redisTemplate.opsForZSet().incrementScore(allTimeKey, productIdStr, quantity);
+            redisTemplate.expire(allTimeKey, ALL_TIME_KEY_TIMEOUT);
 
-            // 일별 랭킹 업데이트
+            // 일별 랭킹 업데이트 (30일 TTL)
             redisTemplate.opsForZSet().incrementScore(dailyKey, productIdStr, quantity);
-
-            // 일별 키는 TTL 설정 (30일 후 자동 삭제)
             redisTemplate.expire(dailyKey, DAILY_KEY_TIMEOUT);
 
             log.debug("판매량 증가 완료: productId={}, quantity={}, date={}", productId, quantity, date);
@@ -209,6 +216,71 @@ public class SalesRankingRedisRepository {
         } catch (Exception e) {
             log.error("주문 기록 마킹 실패: orderId={}, error={}", orderId, e.getMessage(), e);
             throw new RuntimeException("주문 기록 마킹 실패", e);
+        }
+    }
+
+    /**
+     * 판매량 설정 (초기화 전용)
+     * - ZADD (SET) 방식으로 기존 값 덮어쓰기
+     * - INCREMENT와 달리 멱등성 보장 (다중 인스턴스 환경에서 안전)
+     * - 초기화 시에만 사용, 실시간 업데이트는 incrementSalesCount 사용
+     */
+    public void setSalesCount(Long productId, Integer quantity, LocalDate date) {
+        if (productId == null || productId <= 0) {
+            throw new IllegalArgumentException("productId는 양수여야 합니다. productId=" + productId);
+        }
+        if (quantity == null || quantity < 0) {
+            throw new IllegalArgumentException("quantity는 0 이상이어야 합니다. quantity=" + quantity);
+        }
+        if (date == null) {
+            throw new IllegalArgumentException("date는 null일 수 없습니다.");
+        }
+
+        String allTimeKey = keyGenerator.generateAllTimeKey();
+        String dailyKey = keyGenerator.generateDailyKey(date);
+        String productIdStr = productId.toString();
+
+        try {
+            // ZADD: 기존 값이 있으면 덮어쓰기 (멱등성 보장)
+            redisTemplate.opsForZSet().add(allTimeKey, productIdStr, quantity);
+            redisTemplate.expire(allTimeKey, ALL_TIME_KEY_TIMEOUT);
+
+            redisTemplate.opsForZSet().add(dailyKey, productIdStr, quantity);
+            redisTemplate.expire(dailyKey, DAILY_KEY_TIMEOUT);
+
+            log.debug("판매량 설정 완료 (초기화): productId={}, quantity={}, date={}", productId, quantity, date);
+        } catch (Exception e) {
+            log.warn("판매량 설정 실패: productId={}, quantity={}, error={}", productId, quantity, e.getMessage(), e);
+            throw new RuntimeException("판매량 설정 실패", e);
+        }
+    }
+
+    public boolean isInitialized() {
+        try {
+            Boolean exists = redisTemplate.hasKey(INITIALIZATION_FLAG_KEY); // return nullable
+            return Boolean.TRUE.equals(exists);
+        } catch (Exception e) {
+            log.warn("초기화 플래그 확인 실패: error={}", e.getMessage());
+            return false;  // 실패 시 안전하게 초기화 수행하도록 false 반환
+        }
+    }
+
+    /**
+     * 초기화 완료 마킹
+     * - 분산 환경에서 중복 초기화 방지
+     * - 1년 TTL 설정 (랭킹 데이터와 동일한 수명)
+     */
+    public void markInitialized() {
+        try {
+            redisTemplate.opsForValue().set(
+                    INITIALIZATION_FLAG_KEY,
+                    LocalDate.now().toString(),
+                    INITIALIZATION_FLAG_TTL
+            );
+            log.info("초기화 완료 플래그 설정: timestamp={}", LocalDate.now());
+        } catch (Exception e) {
+            log.error("초기화 플래그 설정 실패: error={}", e.getMessage(), e);
+            throw new RuntimeException("초기화 플래그 설정 실패", e);
         }
     }
 }

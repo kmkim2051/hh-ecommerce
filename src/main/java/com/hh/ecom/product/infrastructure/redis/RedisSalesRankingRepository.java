@@ -9,6 +9,7 @@ import com.hh.ecom.product.domain.ProductRepository;
 import com.hh.ecom.product.domain.SalesRanking;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +36,9 @@ import java.util.stream.Collectors;
     matchIfMissing = true  // 기본값: Redis
 )
 public class RedisSalesRankingRepository implements SalesRankingRepository {
+
+    @Value("${redis.sales_ranking_init_n_days:30}")
+    private int INIT_N_DAYS;
 
     private final SalesRankingRedisRepository redisRepository;
     private final ProductRepository productRepository;
@@ -140,7 +144,7 @@ public class RedisSalesRankingRepository implements SalesRankingRepository {
 
         try {
             initializeAllTimeSales();
-            initializeRecentDailySales(30);
+            initializeRecentDailySales(INIT_N_DAYS);
             log.info("Redis 판매 랭킹 초기화 완료");
         } catch (Exception e) {
             log.error("Redis 판매 랭킹 초기화 실패: {}", e.getMessage(), e);
@@ -148,6 +152,11 @@ public class RedisSalesRankingRepository implements SalesRankingRepository {
         }
     }
 
+    /**
+     * 전체 기간 판매량 초기화
+     * - SET 방식 사용 (멱등성 보장)
+     * - 다중 인스턴스 환경에서도 동일한 결과
+     */
     private void initializeAllTimeSales() {
         log.info("전체 기간 판매량 초기화 시작");
 
@@ -160,8 +169,8 @@ public class RedisSalesRankingRepository implements SalesRankingRepository {
 
         allTimeSales.forEach(sales -> {
             try {
-                // 전체 기간은 오늘 날짜로 기록 (날짜는 allTimeKey에서는 무관)
-                redisRepository.incrementSalesCount(
+                // SET 방식: 기존 값 덮어쓰기 (INCREMENT가 아님!)
+                redisRepository.setSalesCount(
                         sales.getProductId(),
                         sales.getSalesCount().intValue(),
                         LocalDate.now()
@@ -175,6 +184,11 @@ public class RedisSalesRankingRepository implements SalesRankingRepository {
         log.info("전체 기간 판매량 초기화 완료: productCount={}", allTimeSales.size());
     }
 
+    /**
+     * 최근 N일 일별 판매량 초기화
+     * - SET 방식 사용 (멱등성 보장)
+     * - 다중 인스턴스 환경에서도 동일한 결과
+     */
     private void initializeRecentDailySales(int days) {
         log.info("최근 {}일 일별 판매량 초기화 시작", days);
 
@@ -192,7 +206,8 @@ public class RedisSalesRankingRepository implements SalesRankingRepository {
 
             dailySales.forEach(sales -> {
                 try {
-                    redisRepository.incrementSalesCount(
+                    // SET 방식: 기존 값 덮어쓰기 (INCREMENT가 아님!)
+                    redisRepository.setSalesCount(
                             sales.getProductId(),
                             sales.getSalesCount().intValue(),
                             date

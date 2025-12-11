@@ -16,9 +16,6 @@ import org.springframework.stereotype.Component;
 public class CouponQueueSerializer {
     private final ObjectMapper objectMapper;
 
-    /**
-     * DTO를 JSON 문자열로 직렬화
-     */
     public String serialize(CouponIssueQueueEntry entry) {
         try {
             return objectMapper.writeValueAsString(entry);
@@ -28,9 +25,6 @@ public class CouponQueueSerializer {
         }
     }
 
-    /**
-     * JSON 문자열을 DTO로 역직렬화
-     */
     public CouponIssueQueueEntry deserialize(String json) {
         try {
             return objectMapper.readValue(json, CouponIssueQueueEntry.class);

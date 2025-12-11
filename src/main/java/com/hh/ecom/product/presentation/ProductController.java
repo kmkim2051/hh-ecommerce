@@ -6,6 +6,7 @@ import com.hh.ecom.product.presentation.api.ProductApi;
 import com.hh.ecom.product.presentation.dto.response.ProductListResponse;
 import com.hh.ecom.product.presentation.dto.response.ProductResponse;
 import com.hh.ecom.product.presentation.dto.response.ProductStockResponse;
+import io.swagger.v3.oas.annotations.Parameter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -57,6 +58,7 @@ public class ProductController implements ProductApi {
     @Override
     @GetMapping("/ranking/views/recent")
     public ResponseEntity<ProductListResponse> getProductsByViewCountInRecentDays(
+            @Parameter(required = true, description = "조회할 최근 N일 값입니다. 최대: 365")
             @RequestParam Integer days,
             @RequestParam(required = false, defaultValue = "10") Integer limit) {
         List<Product> products = productService.getTopByViewCountInRecentDays(days, limit);
@@ -74,6 +76,7 @@ public class ProductController implements ProductApi {
     @Override
     @GetMapping("/ranking/sales/recent")
     public ResponseEntity<ProductListResponse> getProductsBySalesCountInRecentDays(
+            @Parameter(required = true, description = "조회할 최근 N일 값입니다. 최대: 365")
             @RequestParam Integer days,
             @RequestParam(required = false, defaultValue = "10") Integer limit) {
         List<Product> products = productService.getTopBySalesCountInRecentDays(days, limit);
