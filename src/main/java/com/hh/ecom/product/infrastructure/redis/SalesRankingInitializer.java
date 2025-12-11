@@ -1,6 +1,6 @@
 package com.hh.ecom.product.infrastructure.redis;
 
-import com.hh.ecom.common.lock.RedisLockExecutor;
+import com.hh.ecom.common.lock.util.RedisLockExecutor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;

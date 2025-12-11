@@ -1,6 +1,6 @@
-package com.hh.ecom.outbox.application.event;
+package com.hh.ecom.outbox.application.listener;
 
-import com.hh.ecom.order.application.event.OrderCompletedEvent;
+import com.hh.ecom.order.domain.event.OrderCompletedEvent;
 import com.hh.ecom.outbox.application.OutboxEventService;
 
 import lombok.RequiredArgsConstructor;

@@ -1,7 +1,7 @@
 package com.hh.ecom.point.application;
 
-import com.hh.ecom.common.lock.LockKeyGenerator;
-import com.hh.ecom.common.lock.RedisLockExecutor;
+import com.hh.ecom.common.lock.util.LockKeyGenerator;
+import com.hh.ecom.common.lock.util.RedisLockExecutor;
 import com.hh.ecom.point.domain.Point;
 import com.hh.ecom.point.domain.PointRepository;
 import com.hh.ecom.point.domain.PointTransaction;
@@ -14,7 +14,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 

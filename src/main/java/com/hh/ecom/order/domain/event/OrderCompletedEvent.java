@@ -1,4 +1,4 @@
-package com.hh.ecom.order.application.event;
+package com.hh.ecom.order.domain.event;
 
 import com.hh.ecom.order.domain.Order;
 import com.hh.ecom.order.domain.OrderStatus;

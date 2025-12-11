@@ -1,6 +1,6 @@
 package com.hh.ecom.product.application.event;
 
-import com.hh.ecom.order.application.event.OrderCompletedEvent;
+import com.hh.ecom.order.domain.event.OrderCompletedEvent;
 import com.hh.ecom.order.domain.OrderItem;
 import com.hh.ecom.order.domain.OrderItemRepository;
 import com.hh.ecom.product.application.SalesRankingRepository;

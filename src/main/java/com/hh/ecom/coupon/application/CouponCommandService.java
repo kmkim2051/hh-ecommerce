@@ -1,8 +1,8 @@
 package com.hh.ecom.coupon.application;
 
 import com.hh.ecom.common.lock.LockDomain;
-import com.hh.ecom.common.lock.LockKeyGenerator;
-import com.hh.ecom.common.lock.RedisLockExecutor;
+import com.hh.ecom.common.lock.util.LockKeyGenerator;
+import com.hh.ecom.common.lock.util.RedisLockExecutor;
 import com.hh.ecom.common.lock.SimpleLockResource;
 import com.hh.ecom.coupon.domain.Coupon;
 import com.hh.ecom.coupon.domain.CouponRepository;

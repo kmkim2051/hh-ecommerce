@@ -1,7 +1,7 @@
 package com.hh.ecom.coupon.application;
 
-import com.hh.ecom.common.lock.LockKeyGenerator;
-import com.hh.ecom.common.lock.RedisLockExecutor;
+import com.hh.ecom.common.lock.util.LockKeyGenerator;
+import com.hh.ecom.common.lock.util.RedisLockExecutor;
 import com.hh.ecom.common.transaction.OptimisticLockRetryExecutor;
 import com.hh.ecom.coupon.domain.*;
 import com.hh.ecom.coupon.domain.exception.CouponErrorCode;

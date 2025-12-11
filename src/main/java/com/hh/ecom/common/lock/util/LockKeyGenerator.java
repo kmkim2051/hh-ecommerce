@@ -1,4 +1,4 @@
-package com.hh.ecom.common.lock;
+package com.hh.ecom.common.lock.util;
 
 import org.springframework.stereotype.Component;
 
