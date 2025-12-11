@@ -19,7 +19,6 @@ import com.hh.ecom.order.domain.exception.OrderException;
 import com.hh.ecom.point.application.PointService;
 import com.hh.ecom.point.domain.Point;
 import com.hh.ecom.product.application.ProductService;
-import com.hh.ecom.product.application.SalesRankingRepository;
 import com.hh.ecom.product.domain.Product;
 
 import lombok.RequiredArgsConstructor;
@@ -48,7 +47,6 @@ public class OrderCommandService {
     private final CouponCommandService couponCommandService;
 
     private final PointService pointService;
-    private final SalesRankingRepository salesRankingRepository;
 
     private final ApplicationEventPublisher eventPublisher;
     private final RedisLockExecutor redisLockExecutor;
@@ -87,7 +85,7 @@ public class OrderCommandService {
      *
      * 현재 주문 흐름:
      * - PENDING (주문 생성) → PAID (결제 완료) → 종료
-     * - createOrder()에서 PAID 시점에 판매 랭킹 기록
+     * - PAID 시점에 이벤트 발행 → 이벤트 리스너에서 판매 랭킹 기록
      *
      * 향후 확장 가능성:
      * 1. 주문 취소 기능: PAID → CANCELED 전환 시 사용
@@ -100,16 +98,7 @@ public class OrderCommandService {
                 .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
 
         Order updatedOrder = order.updateStatus(newStatus);
-        Order savedOrder = orderRepository.save(updatedOrder);
-
-        // COMPLETED 상태 전환 시 판매량 메트릭 수집
-        // 참고: 현재는 createOrder()에서 PAID 시점에 이미 기록하므로 이 로직은 실행되지 않음
-        if (newStatus == OrderStatus.COMPLETED) {
-            List<OrderItem> orderItems = orderItemRepository.findByOrderId(orderId);
-            salesRankingRepository.recordBatchSales(orderId, orderItems);
-        }
-
-        return savedOrder;
+        return orderRepository.save(updatedOrder);
     }
 
     // ------------------------------ Private Methods ------------------------------
@@ -156,10 +145,7 @@ public class OrderCommandService {
 
         cartService.completeOrderCheckout(userId, productIds);
 
-        // 결제 완료 시점에 판매량 랭킹 기록
-        salesRankingRepository.recordBatchSales(updatedOrder.getId(), savedOrderItems);
-
-        // 결제 완료 이벤트 발행 (외부 시스템 알림용, 트랜잭션 커밋 후 처리됨)
+        // 결제 완료 이벤트 발행 (이벤트 리스너에서 Outbox 기록, 판매 랭킹 등을 처리)
         eventPublisher.publishEvent(OrderCompletedEvent.from(updatedOrder));
 
         log.info("주문 생성 완료: orderId={}, orderNumber={}", updatedOrder.getId(), updatedOrder.getOrderNumber());
