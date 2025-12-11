@@ -23,7 +23,7 @@ import java.util.List;
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class ProductService {
-    @Value("${ranking.max-period-days:365")
+    @Value("${ranking.max-period-days:365}")
     private Integer MAX_PERIOD_DAYS;
 
     private final ProductRepository productRepository;

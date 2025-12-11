@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
 )
 public class RedisSalesRankingRepository implements SalesRankingRepository {
 
-    @Value("${redis.sales_ranking_init_n_days:30}")
+    @Value("${redis.sales-ranking-init-days:30}")
     private int INIT_N_DAYS;
 
     private final SalesRankingRedisRepository redisRepository;
