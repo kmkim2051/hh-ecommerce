@@ -27,12 +27,12 @@ public class OutboxEventService {
      */
     @Transactional
     public OutboxEvent publishOrderEvent(Long orderId, OrderStatus orderStatus) {
-        log.info("Outbox 이벤트 발행 시작: orderId={}, orderStatus={}", orderId, orderStatus);
+        log.info("Outbox 기록 시작: orderId={}, orderStatus={}", orderId, orderStatus);
 
         OutboxEvent outboxEvent = OutboxEvent.create(orderId, orderStatus);
         OutboxEvent savedEvent = outboxEventRepository.save(outboxEvent);
 
-        log.info("Outbox 이벤트 발행 완료: eventId={}, orderId={}, orderStatus={}",
+        log.info("Outbox 기록 완료: eventId={}, orderId={}, orderStatus={}",
                 savedEvent.getId(), orderId, orderStatus);
 
         return savedEvent;
