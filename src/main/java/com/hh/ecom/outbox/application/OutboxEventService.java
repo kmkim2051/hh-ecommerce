@@ -18,14 +18,15 @@ public class OutboxEventService {
 
     /**
      * Outbox Event 발행 (DB 저장)
-     * - 주문 완료 시 이벤트를 Outbox 테이블에 저장
-     * - 주문 트랜잭션과 함께 커밋되어 데이터 일관성 보장
+     * - 주문 완료 후 이벤트를 Outbox 테이블에 저장
+     * - 주문 트랜잭션과 별개의 독립적인 트랜잭션에서 실행
+     * - Outbox 저장 실패해도 주문 성공에는 영향 없음
+     * - 트랜잭션은 OutboxEventListener에서 관리 (REQUIRES_NEW)
      *
      * @param orderId 주문 ID
      * @param orderStatus 주문 상태
      * @return 저장된 OutboxEvent
      */
-    @Transactional
     public OutboxEvent publishOrderEvent(Long orderId, OrderStatus orderStatus) {
         log.info("Outbox 기록 시작: orderId={}, orderStatus={}", orderId, orderStatus);
 
