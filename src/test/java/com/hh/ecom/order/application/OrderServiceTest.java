@@ -1,8 +1,8 @@
 package com.hh.ecom.order.application;
 
 import com.hh.ecom.cart.application.CartService;
-import com.hh.ecom.common.lock.LockKeyGenerator;
-import com.hh.ecom.common.lock.RedisLockExecutor;
+import com.hh.ecom.common.lock.util.LockKeyGenerator;
+import com.hh.ecom.common.lock.util.RedisLockExecutor;
 import com.hh.ecom.coupon.application.CouponCommandService;
 import com.hh.ecom.coupon.application.CouponQueryService;
 import com.hh.ecom.order.application.dto.CreateOrderCommand;

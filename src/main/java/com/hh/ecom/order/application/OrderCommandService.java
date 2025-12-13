@@ -4,7 +4,7 @@ import com.hh.ecom.cart.application.CartService;
 import com.hh.ecom.cart.application.dto.OrderPreparationResult;
 import com.hh.ecom.cart.domain.CartItem;
 import com.hh.ecom.common.lock.OrderLockContext;
-import com.hh.ecom.common.lock.RedisLockExecutor;
+import com.hh.ecom.common.lock.util.RedisLockExecutor;
 import com.hh.ecom.coupon.application.CouponCommandService;
 import com.hh.ecom.coupon.application.CouponQueryService;
 import com.hh.ecom.coupon.domain.Coupon;
@@ -13,16 +13,17 @@ import com.hh.ecom.coupon.domain.CouponUserWithCoupon;
 import com.hh.ecom.order.application.dto.CreateOrderCommand;
 import com.hh.ecom.order.application.dto.DiscountInfo;
 import com.hh.ecom.order.domain.*;
+import com.hh.ecom.order.domain.event.OrderCompletedEvent;
 import com.hh.ecom.order.domain.exception.OrderErrorCode;
 import com.hh.ecom.order.domain.exception.OrderException;
 import com.hh.ecom.point.application.PointService;
 import com.hh.ecom.point.domain.Point;
 import com.hh.ecom.product.application.ProductService;
-import com.hh.ecom.product.application.SalesRankingRepository;
 import com.hh.ecom.product.domain.Product;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -46,8 +47,8 @@ public class OrderCommandService {
     private final CouponCommandService couponCommandService;
 
     private final PointService pointService;
-    private final SalesRankingRepository salesRankingRepository;
 
+    private final ApplicationEventPublisher eventPublisher;
     private final RedisLockExecutor redisLockExecutor;
 
     private final TransactionTemplate transactionTemplate;
@@ -77,21 +78,27 @@ public class OrderCommandService {
         );
     }
 
+    /**
+     * 주문 상태 업데이트
+     *
+     * ⚠️ (피드백) 현재 프로덕션 코드에서는 사용되지 않음 (테스트 전용)
+     *
+     * 현재 주문 흐름:
+     * - PENDING (주문 생성) → PAID (결제 완료) → 종료
+     * - PAID 시점에 이벤트 발행 → 이벤트 리스너에서 판매 랭킹 기록
+     *
+     * 향후 확장 가능성:
+     * 1. 주문 취소 기능: PAID → CANCELED 전환 시 사용
+     * 2. 배송 완료 기능: PAID → DELIVERED → COMPLETED 전환 시 사용
+     * 3. 구매 확정 기능: DELIVERED → CONFIRMED/COMPLETED 전환 시 사용
+     */
     @Transactional
     public Order updateOrderStatus(Long orderId, OrderStatus newStatus) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderException(OrderErrorCode.ORDER_NOT_FOUND));
 
         Order updatedOrder = order.updateStatus(newStatus);
-        Order savedOrder = orderRepository.save(updatedOrder);
-
-        // COMPLETED 상태 전환 시 판매량 메트릭 수집
-        if (newStatus == OrderStatus.COMPLETED) {
-            List<OrderItem> orderItems = orderItemRepository.findByOrderId(orderId);
-            salesRankingRepository.recordBatchSales(orderId, orderItems);
-        }
-
-        return savedOrder;
+        return orderRepository.save(updatedOrder);
     }
 
     // ------------------------------ Private Methods ------------------------------
@@ -137,6 +144,9 @@ public class OrderCommandService {
         Order updatedOrder = orderRepository.save(paidOrder);
 
         cartService.completeOrderCheckout(userId, productIds);
+
+        // 결제 완료 이벤트 발행 (이벤트 리스너에서 Outbox 기록, 판매 랭킹 등을 처리)
+        eventPublisher.publishEvent(OrderCompletedEvent.from(updatedOrder));
 
         log.info("주문 생성 완료: orderId={}, orderNumber={}", updatedOrder.getId(), updatedOrder.getOrderNumber());
         return updatedOrder.setOrderItems(savedOrderItems);

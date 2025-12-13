@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -23,10 +24,17 @@ import java.util.Objects;
 
 /**
  * 쿠폰 발급 큐(redis)를 처리하기 위한 백그라운드 worker
+ * - 테스트 환경에서는 비활성화 가능 (coupon.worker.enabled=false)
+ * - 프로덕션에서는 기본 활성화
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(
+    name = "coupon.worker.enabled",
+    havingValue = "true",
+    matchIfMissing = true  // 설정 없으면 활성화 (프로덕션 기본값)
+)
 public class CouponIssueWorker {
 
     private final TransactionTemplate transactionTemplate;

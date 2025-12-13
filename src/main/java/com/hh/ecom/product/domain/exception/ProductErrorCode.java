@@ -20,8 +20,11 @@ public enum ProductErrorCode {
     // 입력 검증 관련
     INVALID_PRODUCT_NAME("P200", "유효하지 않은 상품명입니다.", HttpStatus.BAD_REQUEST),
     INVALID_PRODUCT_PRICE("P201", "유효하지 않은 상품 가격입니다.", HttpStatus.BAD_REQUEST),
-    INVALID_PRODUCT_DESCRIPTION("P202", "유효하지 않은 상품 설명입니다.", HttpStatus.BAD_REQUEST);
+    INVALID_PRODUCT_DESCRIPTION("P202", "유효하지 않은 상품 설명입니다.", HttpStatus.BAD_REQUEST),
 
+    // 랭킹 관련
+    INVALID_RANKING_PERIOD("P301", "유효하지 않은 조회 기간입니다.", HttpStatus.BAD_REQUEST),
+    ;
     private final String code;
     private final String message;
     private final HttpStatus httpStatus;

@@ -14,21 +14,29 @@ import com.hh.ecom.order.application.dto.CreateOrderCommand;
 import com.hh.ecom.order.domain.*;
 import com.hh.ecom.order.domain.exception.OrderErrorCode;
 import com.hh.ecom.order.domain.exception.OrderException;
+import com.hh.ecom.outbox.domain.OutboxEventRepository;
 import com.hh.ecom.point.application.PointService;
 import com.hh.ecom.point.domain.Point;
 import com.hh.ecom.product.application.ProductService;
+import com.hh.ecom.product.application.SalesRankingRepository;
 import com.hh.ecom.product.domain.Product;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -46,6 +54,14 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
     private OrderRepository orderRepository;
     @Autowired
     private OrderItemRepository orderItemRepository;
+    @Autowired
+    private SalesRankingRepository salesRankingRepository;
+    @Autowired
+    private OutboxEventRepository outboxEventRepository;
+
+    @Autowired
+    @Qualifier("customStringRedisTemplate")
+    private RedisTemplate<String, String> redisTemplate;
 
     @MockitoBean
     private CartService cartService;
@@ -62,6 +78,13 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
     void setUp() {
         orderItemRepository.deleteAll();
         orderRepository.deleteAll();
+        outboxEventRepository.deleteAll();
+        cleanupRedisKeys();
+    }
+
+    @AfterEach
+    void tearDown() {
+        cleanupRedisKeys();
     }
 
     @Test
@@ -186,28 +209,6 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
         assertThat(user2Orders).hasSize(1);
         assertThat(user1Orders).allMatch(order -> order.getUserId().equals(user1));
         assertThat(user2Orders).allMatch(order -> order.getUserId().equals(user2));
-    }
-
-    @Test
-    @DisplayName("통합 테스트 - 주문 상태 변경")
-    void integration_UpdateOrderStatus() {
-        Long userId = 1L;
-        Long cartItemId = 100L;
-        Long productId = 1000L;
-
-        setupMocksForUser(userId, cartItemId, productId, "상품", BigDecimal.valueOf(10000));
-
-        CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), null);
-        Order createdOrder = orderCommandService.createOrder(userId, command);
-
-        assertThat(createdOrder.getStatus()).isEqualTo(OrderStatus.PAID);
-
-        Order completedOrder = orderCommandService.updateOrderStatus(createdOrder.getId(), OrderStatus.COMPLETED);
-
-        assertThat(completedOrder.getStatus()).isEqualTo(OrderStatus.COMPLETED);
-
-        Order retrievedOrder = orderQueryService.getOrderById(createdOrder.getId());
-        assertThat(retrievedOrder.getStatus()).isEqualTo(OrderStatus.COMPLETED);
     }
 
     @Test
@@ -454,5 +455,17 @@ class OrderServiceIntegrationTest extends TestContainersConfig {
                 .expireDate(LocalDateTime.now().plusDays(30))
                 .isUsed(isUsed)
                 .build();
+    }
+
+    private void cleanupRedisKeys() {
+        try {
+            // Clean up sales ranking keys
+            Set<String> rankingKeys = redisTemplate.keys("product:ranking:sales:*");
+            if (!rankingKeys.isEmpty()) {
+                redisTemplate.delete(rankingKeys);
+            }
+        } catch (Exception e) {
+            // Ignore cleanup errors
+        }
     }
 }

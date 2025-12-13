@@ -15,6 +15,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -36,6 +37,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
+@TestPropertySource(properties = {
+    "coupon.worker.enabled=false",  // E2E 테스트에서만 Worker 비활성화
+    "spring.task.scheduling.enabled=false"  // 스케줄러도 비활성화
+})
 @DisplayName("CouponController E2E 테스트 (HTTP to Redis Queue)")
 class CouponControllerE2ETest extends TestContainersConfig {
 

@@ -1,6 +1,7 @@
 package com.hh.ecom.common.lock;
 
 import com.hh.ecom.common.lock.exception.LockAcquisitionException;
+import com.hh.ecom.common.lock.util.RedisLockExecutor;
 import com.hh.ecom.config.TestContainersConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
