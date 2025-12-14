@@ -7,8 +7,6 @@ import com.hh.ecom.product.application.SalesRankingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -17,7 +15,6 @@ import java.util.List;
 /**
  * 판매 랭킹 이벤트 리스너
  * - 주문 완료 이벤트 -> 판매량 랭킹을 Redis에 기록
- * - 주문 트랜잭션 커밋 후 독립적인 트랜잭션에서 실행
  */
 @Slf4j
 @Component
@@ -28,10 +25,9 @@ public class SalesRankingEventListener {
 
     /**
      * 주문 완료 이벤트 처리
-     * - 주문 트랜잭션 커밋 후 실행 (별도 트랜잭션)
+     * - 주문 트랜잭션 커밋 후 실행
      * @param event 주문 완료 이벤트
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleOrderCompletedEvent(OrderCompletedEvent event) {
         try {

@@ -8,8 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -27,15 +25,13 @@ public class OutboxEventListener {
 
     /**
      * 주문 완료 이벤트 처리
-     * - 주문 트랜잭션 커밋 후 비동기로 실행 (별도 스레드 + 별도 트랜잭션)
+     * - 주문 트랜잭션 커밋 후 비동기로 실행 (별도 스레드)
      * - Outbox 이벤트 발행 실패해도 주문은 성공
-     * - REQUIRES_NEW로 독립적인 트랜잭션에서 실행하여 Outbox 저장 보장
      * - @Async로 주문 API 응답 속도 향상 (백그라운드 처리)
      *
      * @param event 주문 완료 이벤트
      */
     @Async("outboxEventExecutor")
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleOrderCompletedEvent(OrderCompletedEvent event) {
         try {
