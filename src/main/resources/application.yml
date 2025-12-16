@@ -26,13 +26,21 @@ spring:
       port: 6379
       timeout: 3000ms
 
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
 # Coupon worker configuration
-coupon:
-  worker:
-    batch-size: 50
-    retry-on-failure: false
+redis-custom:
+  coupon:
+    worker:
+      batch-size: 50
+      retry-on-failure: false
 
 # Ranking strategy configuration
-ranking:
-  sales:
-    strategy: redis  # redis 또는 db
+  ranking:
+    sales:
+      strategy: redis  # redis 또는 db
+      ranking-init-days: 30

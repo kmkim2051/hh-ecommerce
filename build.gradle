@@ -57,6 +57,7 @@ dependencies {
     // 외부 라이브러리 - 버전 명시 필수
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.14'
     implementation 'org.redisson:redisson-spring-boot-starter:3.35.0'
+    implementation 'org.springframework.kafka:spring-kafka'
 
     runtimeOnly 'com.mysql:mysql-connector-j'
 
