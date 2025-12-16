@@ -44,10 +44,10 @@ public class CouponIssueWorker {
     private final CouponRepository couponRepository;
     private final CouponUserRepository couponUserRepository;
 
-    @Value("${coupon.worker.batch-size:50}")
+    @Value("${redis-custom.coupon.worker.batch-size:50}")
     private int batchSize;
 
-    @Value("${coupon.worker.retry-on-failure:false}")
+    @Value("${redis-custom.coupon.worker.retry-on-failure:false}")
     private boolean retryOnFailure;
 
     @Scheduled(fixedDelay = 100)

@@ -19,7 +19,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @ConditionalOnProperty(
-    name = "ranking.sales.strategy",
+    name = "redis-custom.ranking.sales.strategy",
     havingValue = "db"
 )
 public class DbSalesRankingRepository implements SalesRankingRepository {
