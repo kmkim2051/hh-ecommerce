@@ -1,7 +1,6 @@
 package com.hh.ecom.config;
 
-import com.hh.ecom.order.domain.OrderStatus;
-import com.hh.ecom.outbox.domain.OrderEventPublisher;
+import com.hh.ecom.outbox.domain.MessagePublisher;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -15,12 +14,9 @@ public class TestKafkaConfig {
 
     @Bean
     @Primary
-    public OrderEventPublisher noOpOrderEventPublisher() {
-        return new OrderEventPublisher() {
-            @Override
-            public void publish(Long orderId, OrderStatus orderStatus) {
-                // 테스트 환경에서는 실제로 Kafka에 전송하지 않음 (NoOp)
-            }
+    public MessagePublisher noOpMessagePublisher() {
+        return (topic, key, message) -> {
+            // 테스트 환경에서는 실제로 Kafka에 전송하지 않음 (NoOp)
         };
     }
 }

@@ -8,8 +8,10 @@ import com.hh.ecom.coupon.application.CouponCommandService;
 import com.hh.ecom.coupon.application.CouponQueryService;
 import com.hh.ecom.order.application.dto.CreateOrderCommand;
 import com.hh.ecom.order.domain.*;
-import com.hh.ecom.outbox.domain.OutboxEvent;
+import com.hh.ecom.order.domain.event.OrderCompletedEvent;
+import com.hh.ecom.outbox.domain.MessagePublisher;
 import com.hh.ecom.outbox.domain.OutboxEventRepository;
+import com.hh.ecom.outbox.infrastructure.kafka.KafkaTopics;
 import com.hh.ecom.point.application.PointService;
 import com.hh.ecom.point.domain.Point;
 import com.hh.ecom.product.application.ProductService;
@@ -60,6 +62,8 @@ class OrderServiceEventIntegrationTest extends TestContainersConfig {
     @Qualifier("customStringRedisTemplate")
     private RedisTemplate<String, String> redisTemplate;
 
+    @MockitoBean
+    private MessagePublisher messagePublisher;
     @MockitoBean
     private CartService cartService;
     @MockitoBean
@@ -144,8 +148,8 @@ class OrderServiceEventIntegrationTest extends TestContainersConfig {
     }
 
     @Test
-    @DisplayName("통합 테스트 - 주문 생성 시 Outbox 이벤트가 트랜잭션 커밋 후 생성됨")
-    void integration_CreateOrder_CreatesOutboxEventAfterCommit() throws InterruptedException {
+    @DisplayName("통합 테스트 - 주문 생성 시 Kafka 이벤트가 트랜잭션 커밋 후 발행됨")
+    void integration_CreateOrder_PublishesKafkaEventAfterCommit() throws InterruptedException {
         // given
         Long userId = 1L;
         Long cartItemId = 100L;
@@ -164,20 +168,17 @@ class OrderServiceEventIntegrationTest extends TestContainersConfig {
         // @TransactionalEventListener(AFTER_COMMIT)는 트랜잭션 커밋 후 동기적으로 실행되지만 약간의 대기가 필요할 수 있음
         Thread.sleep(200);
 
-        // then - Outbox 이벤트가 생성되었는지 확인
-        List<OutboxEvent> outboxEvents = outboxEventRepository.findByOrderId(createdOrder.getId());
-        assertThat(outboxEvents).isNotEmpty();
-        assertThat(outboxEvents).hasSize(1);
-
-        OutboxEvent outboxEvent = outboxEvents.get(0);
-        assertThat(outboxEvent.getOrderId()).isEqualTo(createdOrder.getId());
-        assertThat(outboxEvent.getOrderStatus()).isEqualTo(OrderStatus.PAID);
-        assertThat(outboxEvent.getCreatedAt()).isNotNull();
+        // then - MessagePublisher의 publish가 호출되었는지 확인
+        verify(messagePublisher, times(1)).publish(
+                eq(KafkaTopics.ORDER_COMPLETED),
+                eq(createdOrder.getId().toString()),
+                any(OrderCompletedEvent.class)
+        );
     }
 
     @Test
-    @DisplayName("통합 테스트 - 여러 주문 생성 시 각각 독립적인 Outbox 이벤트 생성")
-    void integration_CreateMultipleOrders_CreatesIndependentOutboxEvents() throws InterruptedException {
+    @DisplayName("통합 테스트 - 여러 주문 생성 시 각각 독립적으로 Kafka 이벤트 발행")
+    void integration_CreateMultipleOrders_PublishesIndependentKafkaEvents() throws InterruptedException {
         // given
         Long userId1 = 1L;
         Long userId2 = 2L;
@@ -198,24 +199,27 @@ class OrderServiceEventIntegrationTest extends TestContainersConfig {
 
         Thread.sleep(200);
 
-        // then - 각 주문마다 독립적인 Outbox 이벤트가 생성됨
-        List<OutboxEvent> events1 = outboxEventRepository.findByOrderId(order1.getId());
-        List<OutboxEvent> events2 = outboxEventRepository.findByOrderId(order2.getId());
-
-        assertThat(events1).hasSize(1);
-        assertThat(events2).hasSize(1);
-
-        assertThat(events1.get(0).getOrderId()).isEqualTo(order1.getId());
-        assertThat(events2.get(0).getOrderId()).isEqualTo(order2.getId());
-
-        // 전체 Outbox 이벤트 개수 확인
-        List<OutboxEvent> allEvents = outboxEventRepository.findAll();
-        assertThat(allEvents).hasSize(2);
+        // then - 각 주문마다 독립적으로 Kafka 이벤트 발행 확인
+        verify(messagePublisher).publish(
+                eq(KafkaTopics.ORDER_COMPLETED),
+                eq(order1.getId().toString()),
+                any(OrderCompletedEvent.class)
+        );
+        verify(messagePublisher).publish(
+                eq(KafkaTopics.ORDER_COMPLETED),
+                eq(order2.getId().toString()),
+                any(OrderCompletedEvent.class)
+        );
+        verify(messagePublisher, times(2)).publish(
+                eq(KafkaTopics.ORDER_COMPLETED),
+                anyString(),
+                any(OrderCompletedEvent.class)
+        );
     }
 
     @Test
-    @DisplayName("통합 테스트 - 주문 생성 시 Outbox 이벤트는 한 번만 발행됨 (중복 방지)")
-    void integration_CreateOrder_OutboxEventPublishedOnlyOnce() throws InterruptedException {
+    @DisplayName("통합 테스트 - 주문 생성 시 Kafka 이벤트는 한 번만 발행됨 (중복 방지)")
+    void integration_CreateOrder_KafkaEventPublishedOnlyOnce() throws InterruptedException {
         // given
         Long userId = 1L;
         Long cartItemId = 100L;
@@ -229,18 +233,17 @@ class OrderServiceEventIntegrationTest extends TestContainersConfig {
 
         Thread.sleep(200);
 
-        // then - Outbox 이벤트가 정확히 1개만 생성됨
-        List<OutboxEvent> outboxEvents = outboxEventRepository.findByOrderId(createdOrder.getId());
-        assertThat(outboxEvents).hasSize(1);
-
-        // 여러 번 조회해도 개수는 동일
-        List<OutboxEvent> outboxEventsSecondQuery = outboxEventRepository.findByOrderId(createdOrder.getId());
-        assertThat(outboxEventsSecondQuery).hasSize(1);
+        // then - Kafka 이벤트가 정확히 1번만 발행됨
+        verify(messagePublisher, times(1)).publish(
+                eq(KafkaTopics.ORDER_COMPLETED),
+                eq(createdOrder.getId().toString()),
+                any(OrderCompletedEvent.class)
+        );
     }
 
     @Test
-    @DisplayName("통합 테스트 - Outbox 이벤트의 타임스탬프가 주문 생성 시점과 근접함")
-    void integration_CreateOrder_OutboxEventTimestampIsCloseToOrderCreation() throws InterruptedException {
+    @DisplayName("통합 테스트 - 주문 생성 시 Kafka 이벤트 발행 확인")
+    void integration_CreateOrder_PublishesKafkaEvent() throws InterruptedException {
         // given
         Long userId = 1L;
         Long cartItemId = 100L;
@@ -249,26 +252,22 @@ class OrderServiceEventIntegrationTest extends TestContainersConfig {
         setupMocksForUser(userId, cartItemId, productId, "상품", BigDecimal.valueOf(10000));
 
         // when
-        LocalDateTime beforeCreation = LocalDateTime.now();
         CreateOrderCommand command = new CreateOrderCommand(List.of(cartItemId), null);
         Order createdOrder = orderCommandService.createOrder(userId, command);
-        LocalDateTime afterCreation = LocalDateTime.now();
 
         Thread.sleep(200);
 
-        // then - Outbox 이벤트의 타임스탬프가 주문 생성 시간대에 있음
-        List<OutboxEvent> outboxEvents = outboxEventRepository.findByOrderId(createdOrder.getId());
-        assertThat(outboxEvents).hasSize(1);
-
-        OutboxEvent event = outboxEvents.get(0);
-        assertThat(event.getCreatedAt())
-                .isAfterOrEqualTo(beforeCreation.minusSeconds(1))
-                .isBeforeOrEqualTo(afterCreation.plusSeconds(2));
+        // then - Kafka 이벤트가 발행되었는지 확인
+        verify(messagePublisher).publish(
+                eq(KafkaTopics.ORDER_COMPLETED),
+                eq(createdOrder.getId().toString()),
+                any(OrderCompletedEvent.class)
+        );
     }
 
     @Test
-    @DisplayName("통합 테스트 - 동일 사용자의 여러 주문 각각 Outbox 이벤트 생성")
-    void integration_CreateMultipleOrdersBySameUser_EachCreatesOutboxEvent() throws InterruptedException {
+    @DisplayName("통합 테스트 - 동일 사용자의 여러 주문 각각 Kafka 이벤트 발행")
+    void integration_CreateMultipleOrdersBySameUser_EachPublishesKafkaEvent() throws InterruptedException {
         // given
         Long userId = 1L;
         Long cartItemId1 = 100L;
@@ -288,16 +287,22 @@ class OrderServiceEventIntegrationTest extends TestContainersConfig {
 
         Thread.sleep(200);
 
-        // then - 각 주문마다 Outbox 이벤트 생성
-        List<OutboxEvent> events1 = outboxEventRepository.findByOrderId(order1.getId());
-        List<OutboxEvent> events2 = outboxEventRepository.findByOrderId(order2.getId());
-
-        assertThat(events1).hasSize(1);
-        assertThat(events2).hasSize(1);
-
-        // 모든 이벤트가 PAID 상태
-        assertThat(events1.get(0).getOrderStatus()).isEqualTo(OrderStatus.PAID);
-        assertThat(events2.get(0).getOrderStatus()).isEqualTo(OrderStatus.PAID);
+        // then - 각 주문마다 Kafka 이벤트 발행
+        verify(messagePublisher).publish(
+                eq(KafkaTopics.ORDER_COMPLETED),
+                eq(order1.getId().toString()),
+                any(OrderCompletedEvent.class)
+        );
+        verify(messagePublisher).publish(
+                eq(KafkaTopics.ORDER_COMPLETED),
+                eq(order2.getId().toString()),
+                any(OrderCompletedEvent.class)
+        );
+        verify(messagePublisher, times(2)).publish(
+                eq(KafkaTopics.ORDER_COMPLETED),
+                anyString(),
+                any(OrderCompletedEvent.class)
+        );
     }
 
     @Test
