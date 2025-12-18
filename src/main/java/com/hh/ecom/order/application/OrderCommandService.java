@@ -16,6 +16,7 @@ import com.hh.ecom.order.domain.*;
 import com.hh.ecom.order.domain.event.OrderCompletedEvent;
 import com.hh.ecom.order.domain.exception.OrderErrorCode;
 import com.hh.ecom.order.domain.exception.OrderException;
+import com.hh.ecom.order.infrastructure.kafka.OrderCompletedKafkaProducer;
 import com.hh.ecom.point.application.PointService;
 import com.hh.ecom.point.domain.Point;
 import com.hh.ecom.product.application.ProductService;
@@ -49,6 +50,7 @@ public class OrderCommandService {
     private final PointService pointService;
 
     private final ApplicationEventPublisher eventPublisher;
+    private final OrderCompletedKafkaProducer orderCompletedKafkaProducer;
     private final RedisLockExecutor redisLockExecutor;
 
     private final TransactionTemplate transactionTemplate;
@@ -145,7 +147,12 @@ public class OrderCommandService {
 
         cartService.completeOrderCheckout(userId, productIds);
 
-        // 결제 완료 이벤트 발행 (이벤트 리스너에서 Outbox 기록, 판매 랭킹 등을 처리)
+        // 결제 완료 이벤트 발행 (두 가지 경로)
+
+        // 1. Kafka 발행 (외부 시스템 알림)
+        orderCompletedKafkaProducer.publishOrderCompletedEvent(updatedOrder);
+
+        // 2. Spring Event 발행 (내부 로직: SalesRanking)
         eventPublisher.publishEvent(OrderCompletedEvent.from(updatedOrder));
 
         log.info("주문 생성 완료: orderId={}, orderNumber={}", updatedOrder.getId(), updatedOrder.getOrderNumber());

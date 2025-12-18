@@ -106,22 +106,41 @@ public class CouponUserRedisRepository implements CouponUserRepository {
     }
 
     @Override
+    public List<CouponUser> findByCouponId(Long couponId) {
+        // coupon:issued:{couponId} Set에서 이 쿠폰을 받은 모든 사용자 ID 조회
+        String issuedKey = getCouponIssuedKey(couponId);
+        Set<Object> userIds = couponRedisTemplate.opsForSet().members(issuedKey);
+
+        if (userIds == null || userIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 각 사용자에 대해 해당 쿠폰 조회
+        return userIds.stream()
+                .map(userIdObj -> Long.parseLong(String.valueOf(userIdObj)))
+                .map(userId -> findByUserIdAndCouponId(userId, couponId))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public void deleteAll() {
         // 모든 CouponUser 데이터 삭제
         Set<String> couponUserKeys = couponRedisTemplate.keys(COUPON_USER_PREFIX + "*");
-        if (couponUserKeys != null && !couponUserKeys.isEmpty()) {
+        if (!couponUserKeys.isEmpty()) {
             couponRedisTemplate.delete(couponUserKeys);
         }
 
         // 모든 사용자의 쿠폰 목록 삭제
         Set<String> userCouponsKeys = couponRedisTemplate.keys(USER_COUPONS_PREFIX + "*");
-        if (userCouponsKeys != null && !userCouponsKeys.isEmpty()) {
+        if (!userCouponsKeys.isEmpty()) {
             couponRedisTemplate.delete(userCouponsKeys);
         }
 
         // 모든 쿠폰의 발급 목록 삭제
         Set<String> couponIssuedKeys = couponRedisTemplate.keys(COUPON_ISSUED_PREFIX + "*");
-        if (couponIssuedKeys != null && !couponIssuedKeys.isEmpty()) {
+        if (!couponIssuedKeys.isEmpty()) {
             couponRedisTemplate.delete(couponIssuedKeys);
         }
 

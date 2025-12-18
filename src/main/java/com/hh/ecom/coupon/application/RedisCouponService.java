@@ -135,7 +135,7 @@ public class RedisCouponService {
      * @deprecated Kafka 방식에서는 Queue를 사용하지 않으므로 의미가 없습니다.
      *             테스트 목적으로만 유지되며, 향후 제거될 예정입니다.
      */
-    @Deprecated(since = "2025-12-18", forRemoval = true)
+    @Deprecated
     public Long getQueueSize(Long couponId) {
         String queueKey = redisCouponKeyGenerator.generateQueueKey(couponId);
         Long size = redisTemplate.opsForList().size(queueKey);

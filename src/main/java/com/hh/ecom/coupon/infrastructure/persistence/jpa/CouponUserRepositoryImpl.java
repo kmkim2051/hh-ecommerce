@@ -73,6 +73,13 @@ public class CouponUserRepositoryImpl implements CouponUserRepository {
     }
 
     @Override
+    public List<CouponUser> findByCouponId(Long couponId) {
+        return couponUserJpaRepository.findByCouponId(couponId).stream()
+                .map(CouponUserEntity::toDomain)
+                .toList();
+    }
+
+    @Override
     public void deleteAll() {
         couponUserJpaRepository.deleteAll();
     }
