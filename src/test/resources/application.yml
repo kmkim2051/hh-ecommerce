@@ -29,7 +29,7 @@ spring:
       timeout: 3000ms
 
   kafka:
-    enabled: true  # MockBean으로 대체
+    enabled: true
     bootstrap-servers: localhost:9092
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer

@@ -9,6 +9,7 @@ import com.hh.ecom.coupon.domain.CouponUser;
 import com.hh.ecom.coupon.domain.CouponUserWithCoupon;
 import com.hh.ecom.coupon.domain.exception.CouponErrorCode;
 import com.hh.ecom.coupon.domain.exception.CouponException;
+import com.hh.ecom.coupon.infrastructure.kafka.CouponIssueKafkaProducer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,7 +45,7 @@ class CouponControllerTest {
     private CouponCommandService couponCommandService;
 
     @MockitoBean
-    private com.hh.ecom.coupon.application.RedisCouponService redisCouponService;
+    private CouponIssueKafkaProducer couponIssueKafkaProducer;
 
     @Test
     @DisplayName("GET /coupons - 발급 가능한 쿠폰 목록 조회 성공")
@@ -94,8 +95,9 @@ class CouponControllerTest {
         Long userId = 1L;
         Long couponId = 10L;
 
-        // Redis 기반 비동기 플로우는 즉시 QUEUED 응답 반환
-        doNothing().when(redisCouponService).enqueueUserIfEligible(userId, couponId);
+        // Kafka 기반 비동기 플로우는 즉시 QUEUED 응답 반환
+        String requestId = "test-request-id";
+        given(couponIssueKafkaProducer.publishCouponIssueRequest(userId, couponId)).willReturn(requestId);
 
         // When & Then
         mockMvc.perform(post("/coupons/{couponId}/issue", couponId)
@@ -105,9 +107,10 @@ class CouponControllerTest {
                 .andExpect(jsonPath("$.status").value("QUEUED"))
                 .andExpect(jsonPath("$.couponId").value(couponId))
                 .andExpect(jsonPath("$.userId").value(userId))
+                .andExpect(jsonPath("$.requestId").value(requestId))  // requestId 검증 추가
                 .andExpect(jsonPath("$.message").value("쿠폰 발급 요청이 접수되었습니다. 곧 처리됩니다."));
 
-        verify(redisCouponService, times(1)).enqueueUserIfEligible(userId, couponId);
+        verify(couponIssueKafkaProducer, times(1)).publishCouponIssueRequest(userId, couponId);
     }
 
     @Test
@@ -129,8 +132,8 @@ class CouponControllerTest {
         Long userId = 1L;
         Long couponId = 10L;
 
-        doThrow(new CouponException(CouponErrorCode.COUPON_ALREADY_ISSUED))
-                .when(redisCouponService).enqueueUserIfEligible(userId, couponId);
+        given(couponIssueKafkaProducer.publishCouponIssueRequest(userId, couponId))
+                .willThrow(new CouponException(CouponErrorCode.COUPON_ALREADY_ISSUED));
 
         // When & Then
         mockMvc.perform(post("/coupons/{couponId}/issue", couponId)
@@ -138,7 +141,7 @@ class CouponControllerTest {
                 .andDo(print())
                 .andExpect(status().isConflict());
 
-        verify(redisCouponService, times(1)).enqueueUserIfEligible(userId, couponId);
+        verify(couponIssueKafkaProducer, times(1)).publishCouponIssueRequest(userId, couponId);
     }
 
     @Test
@@ -148,8 +151,8 @@ class CouponControllerTest {
         Long userId = 1L;
         Long couponId = 10L;
 
-        doThrow(new CouponException(CouponErrorCode.COUPON_SOLD_OUT))
-                .when(redisCouponService).enqueueUserIfEligible(userId, couponId);
+        given(couponIssueKafkaProducer.publishCouponIssueRequest(userId, couponId))
+                .willThrow(new CouponException(CouponErrorCode.COUPON_SOLD_OUT));
 
         // When & Then
         mockMvc.perform(post("/coupons/{couponId}/issue", couponId)
@@ -157,7 +160,7 @@ class CouponControllerTest {
                 .andDo(print())
                 .andExpect(status().isBadRequest());
 
-        verify(redisCouponService, times(1)).enqueueUserIfEligible(userId, couponId);
+        verify(couponIssueKafkaProducer, times(1)).publishCouponIssueRequest(userId, couponId);
     }
 
     @Test
@@ -167,8 +170,8 @@ class CouponControllerTest {
         Long userId = 1L;
         Long couponId = 99999L;
 
-        doThrow(new CouponException(CouponErrorCode.COUPON_NOT_FOUND))
-                .when(redisCouponService).enqueueUserIfEligible(userId, couponId);
+        given(couponIssueKafkaProducer.publishCouponIssueRequest(userId, couponId))
+                .willThrow(new CouponException(CouponErrorCode.COUPON_NOT_FOUND));
 
         // When & Then
         mockMvc.perform(post("/coupons/{couponId}/issue", couponId)
@@ -176,7 +179,7 @@ class CouponControllerTest {
                 .andDo(print())
                 .andExpect(status().isNotFound());
 
-        verify(redisCouponService, times(1)).enqueueUserIfEligible(userId, couponId);
+        verify(couponIssueKafkaProducer, times(1)).publishCouponIssueRequest(userId, couponId);
     }
 
     @Test

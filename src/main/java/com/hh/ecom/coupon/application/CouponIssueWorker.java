@@ -24,16 +24,23 @@ import java.util.Objects;
 
 /**
  * 쿠폰 발급 큐(redis)를 처리하기 위한 백그라운드 worker
- * - 테스트 환경에서는 비활성화 가능 (coupon.worker.enabled=false)
- * - 프로덕션에서는 기본 활성화
+ *
+ * @deprecated Kafka 기반 방식으로 완전히 전환되었습니다.
+ * CouponIssueKafkaProducer, Kafka Consumer를 사용하세요.
+ *
+ * <p>변경 이력:</p>
+ * <ul>
+ *   <li>구 방식: Redis Queue + CouponIssueWorker (폴링 방식)</li>
+ *   <li>신 방식: Kafka Producer + Consumer (이벤트 기반)</li>
+ * </ul>
  */
+@Deprecated
 @Slf4j
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(
     name = "coupon.worker.enabled",
-    havingValue = "true",
-    matchIfMissing = true  // 설정 없으면 활성화 (프로덕션 기본값)
+    havingValue = "true"
 )
 public class CouponIssueWorker {
 

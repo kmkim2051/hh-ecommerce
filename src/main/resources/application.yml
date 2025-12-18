@@ -32,12 +32,11 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
-# Coupon worker configuration
 redis-custom:
   coupon:
-    worker:
-      batch-size: 50
-      retry-on-failure: false
+    # worker:  # Deprecated: Kafka 기반으로 전환되어 더 이상 사용되지 않음
+    #   batch-size: 50
+    #   retry-on-failure: false
 
 # Ranking strategy configuration
   ranking:

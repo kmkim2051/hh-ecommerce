@@ -9,4 +9,6 @@ public final class KafkaTopics {
     private KafkaTopics() {}
 
     public static final String ORDER_COMPLETED = "order-completed";
+    public static final String COUPON_ISSUE = "coupon-issue";
+    public static final String COUPON_ISSUED = "coupon-issued";
 }
