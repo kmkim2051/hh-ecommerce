@@ -1,9 +1,15 @@
 # 장애 대응 보고서 (Incident Response Report)
 
+### 개요
+
 **장애 ID**: HHPLUS-2025-12-001
+
 **심각도**: Critical
+
 **작성일**: 2025-12-26
+
 **작성자**: Server Dev-1 Team
+
 **검토자**: CTO, 개발팀 리더
 
 ---
