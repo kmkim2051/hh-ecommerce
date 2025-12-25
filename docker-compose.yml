@@ -1,15 +1,162 @@
+# ============================================
+# E-Commerce 부하 테스트 환경 구성
+# ============================================
+#
+# 총 리소스: CPU 5.0 cores, Memory 5GB
+#
+# 실행 방법:
+#   docker-compose up -d
+#
+# 종료 방법:
+#   docker-compose down
+#
+# 로그 확인:
+#   docker-compose logs -f [service-name]
+#
+# ============================================
+
 services:
+  # ============================================
+  # Spring Boot 애플리케이션
+  # ============================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ecom-app:latest
+    container_name: ecom-app
+    ports:
+      - "8080:8080"
+    environment:
+      # Spring Profile
+#      - SPRING_PROFILES_ACTIVE=loadtest
+
+      # Database
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/ecommerce?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=20
+      - SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=10
+
+      # Redis
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+
+      # Kafka
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_KAFKA_CONSUMER_GROUP_ID=ecom-consumer-group
+      - SPRING_KAFKA_LISTENER_CONCURRENCY=3
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      kafka:
+        condition: service_started
+    networks:
+      - ecom-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    restart: unless-stopped
+
+  # ============================================
+  # MySQL Database
+  # ============================================
+  mysql:
+    image: mysql:8.0
+    container_name: ecom-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: ecommerce
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/my.cnf:/etc/mysql/conf.d/my.cnf:ro
+    networks:
+      - ecom-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ppassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # ============================================
+  # Redis Cache
+  # ============================================
+  redis:
+    image: redis:7.2-alpine
+    container_name: ecom-redis
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --appendonly no
+    networks:
+      - ecom-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================
+  # Zookeeper (Kafka 의존성)
+  # ============================================
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: ecom-zookeeper
+    ports:
+      - "2181:2181"
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - "2181:2181"
+      ZOOKEEPER_SYNC_LIMIT: 2
     networks:
       - ecom-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    restart: unless-stopped
 
+  # ============================================
+  # Kafka Message Broker
+  # ============================================
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: ecom-kafka
@@ -20,14 +167,106 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+
+      # 리스너 설정 (컨테이너 간 통신)
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # 복제 설정 (단일 브로커)
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+      # 토픽 자동 생성
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 3
+
+      # 로그 보관 (테스트용 짧게 설정)
+      KAFKA_LOG_RETENTION_HOURS: 1
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+
+      # 성능 튜닝
+      KAFKA_COMPRESSION_TYPE: lz4
+      KAFKA_LOG_CLEANUP_POLICY: delete
     networks:
       - ecom-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
 
+  # ============================================
+  # Kafka 토픽 초기화
+  # ============================================
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: ecom-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - ecom-network
+    entrypoint: ['/bin/sh', '-c']
+    command: |
+      "
+      echo '=========================================='
+      echo 'Kafka 토픽 생성 시작'
+      echo '=========================================='
+
+      # Kafka 브로커 준비 대기
+      cub kafka-ready -b kafka:9092 1 30
+
+      # 비즈니스 토픽 생성 (3 파티션)
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+        --topic order-completed --partitions 3 --replication-factor 1
+
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+        --topic coupon-issue --partitions 3 --replication-factor 1
+
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+        --topic coupon-issued --partitions 3 --replication-factor 1
+
+      # Dead Letter Topics (실패 메시지)
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+        --topic order-completed.DLT --partitions 1 --replication-factor 1
+
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+        --topic coupon-issue.DLT --partitions 1 --replication-factor 1
+
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists \
+        --topic coupon-issued.DLT --partitions 1 --replication-factor 1
+
+      echo '=========================================='
+      echo '생성된 토픽 목록:'
+      kafka-topics --bootstrap-server kafka:9092 --list
+      echo '=========================================='
+      echo 'Kafka 토픽 생성 완료'
+      echo '=========================================='
+      "
+    restart: "no"
+
+# ============================================
+# Volumes
+# ============================================
+volumes:
+  mysql-data:
+    driver: local
+
+# ============================================
+# Networks
+# ============================================
 networks:
   ecom-network:
     driver: bridge

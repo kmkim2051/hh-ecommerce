@@ -1,0 +1,140 @@
+# ============================================
+# E-Commerce 부하 테스트 모니터링 스택
+# ============================================
+#
+# 포함된 서비스:
+# - InfluxDB: k6 메트릭 저장소
+# - Grafana: 실시간 대시보드 및 시각화
+#
+# 사용 방법:
+# 1. 기존 인프라와 함께 실행:
+#    docker-compose up -d
+#    docker-compose -f docker-compose-monitoring.yml up -d
+#
+# 2. 또는 통합 실행:
+#    docker-compose -f docker-compose.yml -f docker-compose-monitoring.yml up -d
+#
+# 3. 접속 정보:
+#    - Grafana: http://localhost:3000 (admin/admin)
+#    - InfluxDB: http://localhost:8086
+#
+# ============================================
+
+version: '3.8'
+
+services:
+  # ============================================
+  # InfluxDB - 시계열 데이터베이스
+  # ============================================
+  influxdb:
+    image: influxdb:1.8
+    container_name: ecom-influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      # 데이터베이스 자동 생성
+      INFLUXDB_DB: k6
+      # 관리자 계정
+      INFLUXDB_ADMIN_USER: admin
+      INFLUXDB_ADMIN_PASSWORD: admin123
+      # HTTP 인증 활성화
+      INFLUXDB_HTTP_AUTH_ENABLED: "false"
+    volumes:
+      # 데이터 영구 저장
+      - influxdb-data:/var/lib/influxdb
+      # 설정 파일 (선택사항)
+      # - ./config/influxdb.conf:/etc/influxdb/influxdb.conf:ro
+    networks:
+      - ecom-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Grafana - 시각화 대시보드
+  # ============================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ecom-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      # 관리자 계정
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+
+      # 익명 접근 허용 (테스트용)
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+
+      # 기본 설정
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/k6-dashboard.json
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      # 데이터 영구 저장
+      - grafana-data:/var/lib/grafana
+
+      # 대시보드 프로비저닝
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - influxdb
+    networks:
+      - ecom-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Kafka UI (선택사항) - Kafka 모니터링
+  # ============================================
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: ecom-kafka-ui
+    ports:
+      - "8090:8080"  # 포트 변경 (Spring Boot와 충돌 방지)
+    environment:
+      KAFKA_CLUSTERS_0_NAME: ecom-kafka
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      DYNAMIC_CONFIG_ENABLED: "true"
+    networks:
+      - ecom-network
+    restart: unless-stopped
+
+  # ============================================
+  # Redis Commander (선택사항) - Redis 모니터링
+  # ============================================
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: ecom-redis-commander
+    ports:
+      - "8081:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    networks:
+      - ecom-network
+    restart: unless-stopped
+
+# ============================================
+# 볼륨 정의
+# ============================================
+volumes:
+  influxdb-data:
+    name: ecom-influxdb-data
+  grafana-data:
+    name: ecom-grafana-data
+
+# ============================================
+# 네트워크 정의 (기존 네트워크 사용)
+# ============================================
+networks:
+  ecom-network:
+    name: ecom_ecom-network
+    external: true

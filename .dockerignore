@@ -1,0 +1,70 @@
+# ============================================
+# Docker Build 최적화를 위한 제외 파일 목록
+# ============================================
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+README*
+docs/
+loadtest/*.md
+loadtest/*.sh
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+
+# Build artifacts
+build/
+target/
+out/
+*.jar
+*.war
+!gradle/wrapper/gradle-wrapper.jar
+
+# Gradle cache
+.gradle/
+gradle-wrapper.properties
+
+# Test files
+src/test/
+**/test/
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Load test scripts
+loadtest/
+k6/
+
+# MySQL data
+mysql-data/
+mysql/*.log
+
+# Monitoring
+grafana/
+prometheus/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*~
