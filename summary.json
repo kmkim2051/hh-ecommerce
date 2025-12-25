@@ -1,0 +1,312 @@
+{
+  "state": {
+    "isStdOutTTY": false,
+    "isStdErrTTY": false,
+    "testRunDurationMs": 90848.969
+  },
+  "metrics": {
+    "http_req_failed": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "passes": 9655,
+        "fails": 0,
+        "rate": 1
+      },
+      "thresholds": {
+        "rate<0.10": {
+          "ok": false
+        }
+      }
+    },
+    "http_req_sending": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 1.127,
+        "p(90)": 0.024,
+        "p(95)": 0.035,
+        "avg": 0.012071983428275805,
+        "min": 0.001,
+        "med": 0.008
+      }
+    },
+    "http_req_receiving": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(90)": 0.066,
+        "p(95)": 0.087,
+        "avg": 0.03389083376488822,
+        "min": 0.005,
+        "med": 0.022,
+        "max": 1.599
+      }
+    },
+    "iteration_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 1190.473863306709,
+        "min": 0.57775,
+        "med": 1003.294354,
+        "max": 2019.878167,
+        "p(90)": 2003.3989044,
+        "p(95)": 2003.9358831
+      }
+    },
+    "http_reqs": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "rate": 106.27528420272992,
+        "count": 9655
+      },
+      "thresholds": {
+        "rate>50": {
+          "ok": true
+        }
+      }
+    },
+    "fail_count": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 9654,
+        "rate": 106.26427692316464
+      }
+    },
+    "data_sent": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "rate": 18900.676792490623,
+        "count": 1717107
+      }
+    },
+    "errors": {
+      "contains": "default",
+      "values": {
+        "rate": 1,
+        "passes": 4562,
+        "fails": 0
+      },
+      "thresholds": {
+        "rate<0.10": {
+          "ok": false
+        }
+      },
+      "type": "rate"
+    },
+    "api_response_time": {
+      "values": {
+        "avg": 2.2780194737932464,
+        "min": 0,
+        "med": 2,
+        "max": 22,
+        "p(90)": 3,
+        "p(95)": 4
+      },
+      "type": "trend",
+      "contains": "default"
+    },
+    "http_req_tls_handshaking": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 0,
+        "min": 0,
+        "med": 0,
+        "max": 0,
+        "p(90)": 0,
+        "p(95)": 0
+      }
+    },
+    "duplicate_responses": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "fails": 0,
+        "rate": 1,
+        "passes": 5092
+      }
+    },
+    "vus_max": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "max": 300,
+        "value": 300,
+        "min": 300
+      }
+    },
+    "vus": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "value": 6,
+        "min": 4,
+        "max": 299
+      }
+    },
+    "data_received": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 2609673,
+        "rate": 28725.40028494985
+      }
+    },
+    "http_req_blocked": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 0.006,
+        "max": 7.295,
+        "p(90)": 0.194,
+        "p(95)": 0.223,
+        "avg": 0.08138984981874348,
+        "min": 0
+      }
+    },
+    "http_req_connecting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 0.184,
+        "avg": 0.06826856551009843,
+        "min": 0,
+        "med": 0,
+        "max": 7.183,
+        "p(90)": 0.163
+      }
+    },
+    "iterations": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 9654,
+        "rate": 106.26427692316464
+      }
+    },
+    "checks": {
+      "values": {
+        "rate": 0.505489952351357,
+        "passes": 24400,
+        "fails": 23870
+      },
+      "type": "rate",
+      "contains": "default"
+    },
+    "http_req_waiting": {
+      "contains": "time",
+      "values": {
+        "avg": 2.116690523045054,
+        "min": 0.481,
+        "med": 2.053,
+        "max": 21.092,
+        "p(90)": 3.1602000000000006,
+        "p(95)": 3.491
+      },
+      "type": "trend"
+    },
+    "group_duration": {
+      "contains": "time",
+      "values": {
+        "avg": 2.32875898674124,
+        "min": 0.524167,
+        "med": 2.2418335000000003,
+        "max": 21.656542,
+        "p(90)": 3.4545792000000004,
+        "p(95)": 3.8316875999999995
+      },
+      "type": "trend"
+    },
+    "http_req_duration": {
+      "thresholds": {
+        "p(50)<100": {
+          "ok": true
+        },
+        "p(95)<300": {
+          "ok": true
+        },
+        "p(99)<500": {
+          "ok": true
+        }
+      },
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 0.489,
+        "med": 2.096,
+        "max": 21.18,
+        "p(90)": 3.219,
+        "p(95)": 3.552599999999999,
+        "avg": 2.162653340238224
+      }
+    }
+  },
+  "root_group": {
+    "name": "",
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": [
+      {
+        "name": "Coupon Issue API",
+        "path": "::Coupon Issue API",
+        "id": "1f8b461ee1ef2af330ac900d9104c055",
+        "groups": [],
+        "checks": [
+            {
+              "passes": 0,
+              "fails": 9654,
+              "name": "status is 200 (QUEUED)",
+              "path": "::Coupon Issue API::status is 200 (QUEUED)",
+              "id": "eacb7b83791265c5efe24541edabdf96"
+            },
+            {
+              "name": "status is 409 (ALREADY_ISSUED)",
+              "path": "::Coupon Issue API::status is 409 (ALREADY_ISSUED)",
+              "id": "da9cd92c7e85b8a427828a19f4712e77",
+              "passes": 5092,
+              "fails": 4562
+            },
+            {
+              "name": "status is 410 (SOLD_OUT)",
+              "path": "::Coupon Issue API::status is 410 (SOLD_OUT)",
+              "id": "ff167b6d5857a6c7306268fd61ca4286",
+              "passes": 0,
+              "fails": 9654
+            },
+            {
+              "fails": 0,
+              "name": "response time < 100ms",
+              "path": "::Coupon Issue API::response time < 100ms",
+              "id": "3043602030d312699b7d8ef63222f635",
+              "passes": 9654
+            },
+            {
+              "name": "response has body",
+              "path": "::Coupon Issue API::response has body",
+              "id": "b8f3e73c20eadb7b288be451ef0d0e03",
+              "passes": 9654,
+              "fails": 0
+            }
+          ]
+      }
+    ],
+    "checks": []
+  },
+  "options": {
+    "summaryTrendStats": [
+      "avg",
+      "min",
+      "med",
+      "max",
+      "p(90)",
+      "p(95)"
+    ],
+    "summaryTimeUnit": "",
+    "noColor": false
+  }
+}

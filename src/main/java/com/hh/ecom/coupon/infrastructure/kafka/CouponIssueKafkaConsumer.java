@@ -43,7 +43,8 @@ public class CouponIssueKafkaConsumer {
     @KafkaListener(
         topics = KafkaTopics.COUPON_ISSUE,
         groupId = "coupon-issue-group",
-        concurrency = "3"
+        concurrency = "3",
+        containerFactory = "couponKafkaListenerContainerFactory"
     )
     public void consumeCouponIssueRequest(CouponIssueRequestEvent event) {
         log.info("쿠폰 발급 요청 수신: requestId={}, userId={}, couponId={}",

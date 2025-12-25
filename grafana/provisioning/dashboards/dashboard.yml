@@ -1,0 +1,18 @@
+#
+# 이 파일은 Grafana 시작 시 자동으로 대시보드를 로드합니다.
+#
+
+
+apiVersion: 1
+
+providers:
+  - name: 'k6-loadtest'
+    orgId: 1
+    folder: 'Load Testing'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: true
