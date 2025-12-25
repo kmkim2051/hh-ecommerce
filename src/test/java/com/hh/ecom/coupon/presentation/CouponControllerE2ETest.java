@@ -28,20 +28,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Redis 기반 쿠폰 시스템 End-to-End 테스트
- * - TestContainers (MySQL + Redis) 사용
+ * Kafka 기반 쿠폰 시스템 End-to-End 테스트
+ * - TestContainers (MySQL + Redis + Kafka) 사용
  * - MockMvc를 통한 실제 HTTP 요청 테스트
- * - HTTP → Redis 큐 등록까지의 E2E 테스트
+ * - HTTP → Kafka 이벤트 발행까지의 E2E 테스트
  *
- * Note: 비동기 Worker 처리는 스케줄러가 자동 실행하므로 테스트하지 않음
+ * Note: Kafka Consumer 처리는 비동기로 실행되므로 E2E 테스트에서는 HTTP 응답까지만 검증
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestPropertySource(properties = {
-    "coupon.worker.enabled=false",  // E2E 테스트에서만 Worker 비활성화
+    "coupon.worker.enabled=false",  // Redis Queue Worker 비활성화 (Kafka 사용)
     "spring.task.scheduling.enabled=false"  // 스케줄러도 비활성화
 })
-@DisplayName("CouponController E2E 테스트 (HTTP to Redis Queue)")
+@DisplayName("CouponController E2E 테스트 (HTTP to Kafka)")
 class CouponControllerE2ETest extends TestContainersConfig {
 
     @Autowired
@@ -113,8 +113,8 @@ class CouponControllerE2ETest extends TestContainersConfig {
     }
 
     @Test
-    @DisplayName("E2E - 쿠폰 발급 요청 → Redis 큐 등록 확인")
-    void e2e_IssueCoupon_EnqueueToRedis() throws Exception {
+    @DisplayName("E2E - 쿠폰 발급 요청 → Kafka 이벤트 발행")
+    void e2e_IssueCoupon_PublishToKafka() throws Exception {
         // given
         Long userId = 1L;
 
@@ -126,15 +126,14 @@ class CouponControllerE2ETest extends TestContainersConfig {
                 .andExpect(jsonPath("$.status").value("QUEUED"))
                 .andExpect(jsonPath("$.message").value("쿠폰 발급 요청이 접수되었습니다. 곧 처리됩니다."))
                 .andExpect(jsonPath("$.userId").value(userId))
-                .andExpect(jsonPath("$.couponId").value(testCoupon.getId()));
+                .andExpect(jsonPath("$.couponId").value(testCoupon.getId()))
+                .andExpect(jsonPath("$.requestId").exists());  // requestId 존재 확인
 
-        // then - Redis 큐에 등록 확인
-        Long queueSize = redisCouponService.getQueueSize(testCoupon.getId());
-        assertThat(queueSize).isEqualTo(1L);
-
-        // Redis 참여자 집합에 등록 확인
+        // then - Redis 참여자 집합에 등록 확인 (빠른 검증용)
         Long participantCount = redisCouponService.getParticipantCount(testCoupon.getId());
         assertThat(participantCount).isEqualTo(1L);
+
+        // Kafka로 이벤트가 발행되고, Consumer가 비동기로 처리함
     }
 
 
@@ -149,7 +148,8 @@ class CouponControllerE2ETest extends TestContainersConfig {
                         .header("userId", userId.toString())
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("QUEUED"));
+                .andExpect(jsonPath("$.status").value("QUEUED"))
+                .andExpect(jsonPath("$.requestId").exists());
 
         // then - Step 2: 두 번째 요청 실패 (중복 체크)
         mockMvc.perform(post("/coupons/{couponId}/issue", testCoupon.getId())
@@ -180,7 +180,8 @@ class CouponControllerE2ETest extends TestContainersConfig {
                             .header("userId", String.valueOf(i))
                             .contentType(MediaType.APPLICATION_JSON))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status").value("QUEUED"));
+                    .andExpect(jsonPath("$.status").value("QUEUED"))
+                    .andExpect(jsonPath("$.requestId").exists());
         }
 
         // then - Redis 큐에 등록 확인 (Worker가 처리 중일 수 있으므로 최소 0개 이상)

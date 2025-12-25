@@ -22,6 +22,19 @@ spring:
         format_sql: false
     show-sql: false
 
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 3000ms
+
+  kafka:
+    enabled: true
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
 logging:
   level:
     org.hibernate: warn

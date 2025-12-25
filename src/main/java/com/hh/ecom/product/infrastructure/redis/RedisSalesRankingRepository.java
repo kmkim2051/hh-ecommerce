@@ -31,13 +31,13 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @ConditionalOnProperty(
-    name = "ranking.sales.strategy",
+    name = "redis-custom.ranking.sales.strategy",
     havingValue = "redis",
     matchIfMissing = true  // 기본값: Redis
 )
 public class RedisSalesRankingRepository implements SalesRankingRepository {
 
-    @Value("${redis.sales-ranking-init-days:30}")
+    @Value("${redis-custom.ranking.sales.ranking-init-days:30}")
     private int INIT_N_DAYS;
 
     private final SalesRankingRedisRepository redisRepository;

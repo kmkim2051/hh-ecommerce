@@ -13,4 +13,6 @@ public interface CouponUserJpaRepository extends JpaRepository<CouponUserEntity,
     List<CouponUserEntity> findByUserId(Long userId);
 
     List<CouponUserEntity> findByUserIdAndIsUsed(Long userId, Boolean isUsed);
+
+    List<CouponUserEntity> findByCouponId(Long couponId);
 }

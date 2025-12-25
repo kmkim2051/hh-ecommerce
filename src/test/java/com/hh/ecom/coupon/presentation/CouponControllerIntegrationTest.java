@@ -9,6 +9,7 @@ import com.hh.ecom.coupon.domain.CouponRepository;
 import com.hh.ecom.coupon.domain.CouponUser;
 import com.hh.ecom.coupon.domain.CouponUserRepository;
 import com.hh.ecom.coupon.domain.exception.CouponException;
+import com.hh.ecom.coupon.infrastructure.kafka.CouponIssueKafkaProducer;
 import com.hh.ecom.coupon.presentation.dto.response.CouponIssueResponse;
 import com.hh.ecom.coupon.presentation.dto.response.CouponListResponse;
 import com.hh.ecom.coupon.presentation.dto.response.MyCouponListResponse;
@@ -38,6 +39,9 @@ class CouponControllerIntegrationTest extends TestContainersConfig {
     private CouponCommandService couponCommandService;
 
     @Autowired
+    private CouponIssueKafkaProducer couponIssueKafkaProducer;
+
+    @Autowired
     private RedisCouponService redisCouponService;
 
     @Autowired
@@ -56,7 +60,7 @@ class CouponControllerIntegrationTest extends TestContainersConfig {
 
     @BeforeEach
     void setUp() {
-        couponController = new CouponController(couponQueryService, redisCouponService);
+        couponController = new CouponController(couponQueryService, couponIssueKafkaProducer);
 
         couponUserRepository.deleteAll();
         couponRepository.deleteAll();
@@ -100,7 +104,7 @@ class CouponControllerIntegrationTest extends TestContainersConfig {
     }
 
     @Test
-    @DisplayName("쿠폰을 성공적으로 발급받는다 (비동기 큐 등록)")
+    @DisplayName("쿠폰을 성공적으로 발급받는다 (Kafka 이벤트 발행)")
     void issueCoupon_Success() {
         // when
         ResponseEntity<CouponIssueResponse> response = couponController.issueCoupon(testUserId, testCoupon.getId());
@@ -112,10 +116,9 @@ class CouponControllerIntegrationTest extends TestContainersConfig {
         assertThat(response.getBody().message()).isEqualTo("쿠폰 발급 요청이 접수되었습니다. 곧 처리됩니다.");
         assertThat(response.getBody().userId()).isEqualTo(testUserId);
         assertThat(response.getBody().couponId()).isEqualTo(testCoupon.getId());
+        assertThat(response.getBody().requestId()).isNotNull();  // requestId 검증 추가
 
-        // Verify the request was added to the queue
-        Long queueSize = redisCouponService.getQueueSize(testCoupon.getId());
-        assertThat(queueSize).isGreaterThan(0L);
+        // Kafka로 이벤트가 발행되었고, Consumer가 비동기로 처리함
     }
 
     @Test

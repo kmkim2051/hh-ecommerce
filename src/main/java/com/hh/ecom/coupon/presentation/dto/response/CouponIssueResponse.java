@@ -18,6 +18,9 @@ public record CouponIssueResponse(
         @Schema(description = "쿠폰 ID", example = "1")
         Long couponId,
 
+        @Schema(description = "요청 ID (UUID) - 비동기 처리 추적용", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+        String requestId,
+
         @Schema(description = "쿠폰명 (큐잉된 경우 null)", example = "신규가입 할인 쿠폰")
         String couponName,
 
@@ -41,6 +44,7 @@ public record CouponIssueResponse(
                 couponUser.getId(),
                 couponUser.getUserId(),
                 couponUser.getCouponId(),
+                null,  // requestId는 동기 발급에서는 불필요
                 coupon.getName(),
                 coupon.getDiscountAmount(),
                 couponUser.getIssuedAt(),
@@ -50,11 +54,12 @@ public record CouponIssueResponse(
         );
     }
 
-    public static CouponIssueResponse queued(Long userId, Long couponId, String message) {
+    public static CouponIssueResponse queued(Long userId, Long couponId, String requestId, String message) {
         return new CouponIssueResponse(
                 null,
                 userId,
                 couponId,
+                requestId,  // 비동기 발급 시 추적용 requestId
                 null,
                 null,
                 null,
